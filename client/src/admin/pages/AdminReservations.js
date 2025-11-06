@@ -17,10 +17,11 @@ import { useNavigate } from "react-router-dom";
 import Swal from "sweetalert2";
 import { io } from "socket.io-client";
 
-const API_BASE = "http://localhost:5000/api/reservations";
-const API_GET_ALL = `${API_BASE}/admin/reservations`;
-const API_CANCEL = (id) => `${API_BASE}/admin/reservations/${id}/cancel`;
-const API_VALIDATE = (id) => `${API_BASE}/admin/reservations/${id}/validate`;
+const API_BASE = process.env.REACT_APP_API_URL || "http://localhost:5000";
+const API_URL = `${API_BASE}/api/reservations`;
+const API_GET_ALL = `${API_URL}/admin/reservations`;
+const API_CANCEL = (id) => `${API_URL}/admin/reservations/${id}/cancel`;
+const API_VALIDATE = (id) => `${API_URL}/admin/reservations/${id}/validate`;
 
 const AdminReservations = () => {
   const [reservations, setReservations] = useState([]);
@@ -51,7 +52,7 @@ const AdminReservations = () => {
   useEffect(() => {
     fetchReservations();
     // temps réel
-    const socket = io("http://localhost:5000", { transports: ["websocket"] });
+    const socket = io("${API_BASE}", { transports: ["websocket"] });
     socket.on("reservation_created", () => fetchReservations());
     socket.on("reservation_updated", () => fetchReservations());
     socket.on("reservation_deleted", () => fetchReservations());

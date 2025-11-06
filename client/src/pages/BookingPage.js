@@ -17,6 +17,9 @@ const BookingPage = () => {
   const [totalSeats, setTotalSeats] = useState(50);
 
   const token = localStorage.getItem("token");
+  
+  const API_BASE = process.env.REACT_APP_API_URL || "http://localhost:5000";
+  const API_URL = `${API_BASE}/api/reservations`;
 
   // ✅ Charger les sièges réservés
   useEffect(() => {
@@ -24,7 +27,7 @@ const BookingPage = () => {
       if (!trajet?._id) return;
       try {
         const { data } = await axios.get(
-          `http://localhost:5000/api/reservations/trajet/${trajet._id}`
+          `${API_URL}/trajet/${trajet._id}`
         );
         setReservedSeats(data.map((r) => r.seat));
       } catch (err) {
@@ -61,7 +64,7 @@ const BookingPage = () => {
     try {
       setLoading(true);
       const { data } = await axios.post(
-        "http://localhost:5000/api/reservations",
+        "${API_BASE}/api/reservations",
         {
           trajet,
           seats: selectedSeats,

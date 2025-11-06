@@ -8,7 +8,8 @@ import html2canvas from "html2canvas";
 import jsPDF from "jspdf";
 import Swal from "sweetalert2";
 
-const API_BASE = "http://localhost:5000/api/reservations/admin/reservations";
+const API_BASE = process.env.REACT_APP_API_URL || "http://localhost:5000";
+const API_URL = `${API_BASE}/api/reservations/admin/reservations`;
 
 const AdminTicketView = () => {
   const { id } = useParams();

@@ -3,7 +3,8 @@ import axios from "axios";
 import { motion } from "framer-motion";
 import { Shield, Trash2, Edit3, UserCheck, Loader2 } from "lucide-react";
 
-const API_URL = "http://localhost:5000/api/logs";
+const API_BASE = process.env.REACT_APP_API_URL || "http://localhost:5000";
+const API_URL = `${API_BASE}/api/logs`;
 
 const AdminLogs = () => {
   const [logs, setLogs] = useState([]);

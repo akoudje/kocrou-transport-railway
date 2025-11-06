@@ -5,7 +5,10 @@ import { useLocation, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import { ArrowLeft, Bus, Loader2, MapPin } from "lucide-react";
 
-const API_URL = "http://localhost:5000/api/trajets";
+
+const API_BASE = process.env.REACT_APP_API_URL || "http://localhost:5000";
+const API_URL = `${API_BASE}/api/trajets`;
+
 
 const SearchResults = () => {
   const navigate = useNavigate();

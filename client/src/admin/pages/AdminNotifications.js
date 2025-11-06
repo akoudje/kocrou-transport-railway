@@ -4,8 +4,9 @@ import { Bell, UserPlus, Bus, XCircle, Loader2 } from "lucide-react";
 import io from "socket.io-client";
 import axios from "axios";
 
-const API_URL = "http://localhost:5000/api/notifications";
-const SOCKET_URL = "http://localhost:5000";
+const API_BASE = process.env.REACT_APP_API_URL || "http://localhost:5000";
+const API_URL = `${API_BASE}/api/notifications`;
+const SOCKET_URL = API_BASE;
 
 const AdminNotifications = () => {
   const [notifications, setNotifications] = useState([]);

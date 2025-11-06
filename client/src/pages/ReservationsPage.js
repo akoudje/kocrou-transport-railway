@@ -13,7 +13,8 @@ import {
 import { useNavigate } from "react-router-dom";
 import Swal from "sweetalert2"; // ✅ pour les alertes modernes
 
-const API_URL = "http://localhost:5000/api/reservations";
+const API_BASE = process.env.REACT_APP_API_URL || "http://localhost:5000";
+const API_URL = `${API_BASE}/api/reservations`;
 
 const ReservationsPage = () => {
   const [reservations, setReservations] = useState([]);
