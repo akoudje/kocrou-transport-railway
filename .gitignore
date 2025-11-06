@@ -1,0 +1,12 @@
+# Ignorer les dépendances
+node_modules/
+client/node_modules/
+.cache/
+*.pack
+
+# Autres fichiers à ignorer
+.env
+dist/
+build/
+.DS_Store
+*.log
