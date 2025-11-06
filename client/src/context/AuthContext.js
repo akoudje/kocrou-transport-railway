@@ -1,14 +1,11 @@
+// src/context/AuthContext.js
 import React, { createContext, useState, useEffect } from "react";
-import axios from "axios";
+import api from "../utils/api"; // ✅ On utilise ton instance Axios configurée
 
-// 🔗 URL de base de ton API backend
-const API_BASE = process.env.REACT_APP_API_URL || "http://localhost:5000";
-const API_URL = `${API_BASE}/api/auth`;
+const API_URL = "/auth"; // pas besoin de répéter la base, elle est dans api.js
 
-// 🧩 Création du contexte
 export const AuthContext = createContext();
 
-// ✅ Provider global d’authentification
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(() => {
     const storedUser = localStorage.getItem("user");
@@ -19,7 +16,6 @@ export const AuthProvider = ({ children }) => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
-  // 🔹 Persiste les données d'auth dans localStorage
   useEffect(() => {
     if (user && token) {
       localStorage.setItem("user", JSON.stringify(user));
@@ -30,12 +26,12 @@ export const AuthProvider = ({ children }) => {
     }
   }, [user, token]);
 
-  // ✅ Fonction d’inscription
+  // ✅ Inscription
   const register = async (name, email, password) => {
     setLoading(true);
     setError(null);
     try {
-      const res = await axios.post(`${API_URL}/register`, { name, email, password });
+      const res = await api.post(`${API_URL}/register`, { name, email, password });
       console.log("✅ Inscription réussie :", res.data);
       return true;
     } catch (err) {
@@ -47,12 +43,12 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  // ✅ Fonction de connexion
+  // ✅ Connexion
   const login = async (email, password) => {
     setLoading(true);
     setError(null);
     try {
-      const res = await axios.post(`${API_URL}/login`, { email, password });
+      const res = await api.post(`${API_URL}/login`, { email, password });
       const { user, token } = res.data;
       setUser(user);
       setToken(token);
@@ -74,12 +70,12 @@ export const AuthProvider = ({ children }) => {
     localStorage.removeItem("token");
   };
 
-  // ✅ Vérifie automatiquement le token (optionnel)
+  // ✅ Application automatique du token sur `api`
   useEffect(() => {
     if (token) {
-      axios.defaults.headers.common["Authorization"] = `Bearer ${token}`;
+      api.defaults.headers.common["Authorization"] = `Bearer ${token}`;
     } else {
-      delete axios.defaults.headers.common["Authorization"];
+      delete api.defaults.headers.common["Authorization"];
     }
   }, [token]);
 

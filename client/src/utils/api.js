@@ -1,19 +1,28 @@
+// client/src/utils/api.js
 import axios from "axios";
 
-const API_BASE = process.env.REACT_APP_API_URL || "http://localhost:5000";
+// 🌍 Base API URL : dynamique selon l'environnement
+const API_BASE =
+  process.env.REACT_APP_API_URL ||
+  (process.env.NODE_ENV === "production"
+    ? "https://kocrou-transport-server.onrender.com" // ← ton URL Render backend
+    : "http://localhost:5000");
 
-
-const API = axios.create({
-  baseURL: `${API_BASE}/api`, // ton backend
+// 🧩 Configuration Axios par défaut
+const api = axios.create({
+  baseURL: API_BASE + "/api",
+  headers: {
+    "Content-Type": "application/json",
+  },
 });
 
-// Intercepteur : ajoute automatiquement le token JWT dans le header
-API.interceptors.request.use((config) => {
-  const user = JSON.parse(localStorage.getItem("user"));
-  if (user?.token) {
-    config.headers.Authorization = `Bearer ${user.token}`;
+// 🔒 Ajouter automatiquement le token JWT si présent
+api.interceptors.request.use((config) => {
+  const token = localStorage.getItem("token");
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`;
   }
   return config;
 });
 
-export default API;
+export default api;

@@ -1,36 +1,44 @@
-import React, { useState, useEffect } from "react";
-import axios from "axios";
+// src/client/admin/pages/AdminTrajets.js
+import React, { useEffect, useState } from "react";
 import { motion } from "framer-motion";
-import { Plus, Trash2, Bus, RefreshCw, CheckCircle2 } from "lucide-react";
-
-const API_BASE = process.env.REACT_APP_API_URL || "http://localhost:5000";
-const API_URL = `${API_BASE}/api/trajets`;
+import {
+  Plus,
+  Trash2,
+  Edit,
+  RefreshCw,
+  Bus,
+  MapPin,
+  DollarSign,
+  Loader2,
+  Save,
+} from "lucide-react";
+import Swal from "sweetalert2";
+import api from "../../utils/api"; // ✅ Import centralisé vers ton utilitaire axios
 
 const AdminTrajets = () => {
   const [trajets, setTrajets] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
-  const [success, setSuccess] = useState("");
+  const [editingTrajet, setEditingTrajet] = useState(null);
   const [form, setForm] = useState({
-    lignePrincipale: { depart: "", arrivee: "", prix: "" },
-    dateDepart: "",
-    heureDepart: "",
-    heureArrivee: "",
-    totalPlaces: "",
+    compagnie: "",
+    lignePrincipale: { depart: "", arrivee: "" },
     segments: [],
+    prixTotal: "",
+    nombrePlaces: 50,
   });
 
   const token = localStorage.getItem("token");
 
-  // 🔹 Récupération des trajets existants
+  // ✅ Charger les trajets
   const fetchTrajets = async () => {
     try {
       setLoading(true);
-      const res = await axios.get(API_URL);
-      setTrajets(res.data);
+      const { data } = await api.get("/trajets", {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      setTrajets(data);
     } catch (err) {
-      console.error("Erreur récupération trajets :", err);
-      setError("Impossible de charger les trajets.");
+      console.error("Erreur chargement trajets :", err);
     } finally {
       setLoading(false);
     }
@@ -40,286 +48,332 @@ const AdminTrajets = () => {
     fetchTrajets();
   }, []);
 
-  // 🔹 Gestion des changements de formulaire
-  const handleChange = (e, field, subField = null) => {
-    if (subField) {
+  // ✅ Gérer les changements de champs
+  const handleChange = (e) => {
+    const { name, value } = e.target;
+
+    if (["depart", "arrivee"].includes(name)) {
       setForm((prev) => ({
         ...prev,
-        [field]: { ...prev[field], [subField]: e.target.value },
+        lignePrincipale: { ...prev.lignePrincipale, [name]: value },
       }));
     } else {
-      setForm((prev) => ({ ...prev, [field]: e.target.value }));
+      setForm((prev) => ({ ...prev, [name]: value }));
     }
   };
 
-  // 🔹 Gestion des segments
+  // ✅ Ajouter un segment
   const addSegment = () => {
     setForm((prev) => ({
       ...prev,
-      segments: [...prev.segments, { depart: "", arrivee: "", prix: "" }],
+      segments: [
+        ...prev.segments,
+        { depart: "", arrivee: "", prix: "", duree: "" },
+      ],
     }));
   };
 
-  const updateSegment = (index, key, value) => {
+  // ✅ Modifier un segment
+  const handleSegmentChange = (index, field, value) => {
     const updatedSegments = [...form.segments];
-    updatedSegments[index][key] = value;
+    updatedSegments[index][field] = value;
     setForm((prev) => ({ ...prev, segments: updatedSegments }));
   };
 
+  // ✅ Supprimer un segment
   const removeSegment = (index) => {
-    setForm((prev) => ({
-      ...prev,
-      segments: prev.segments.filter((_, i) => i !== index),
-    }));
+    const updatedSegments = form.segments.filter((_, i) => i !== index);
+    setForm((prev) => ({ ...prev, segments: updatedSegments }));
   };
 
-  // 🔹 Envoi du formulaire
+  // ✅ Soumission (ajout ou modification)
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setError("");
-    setSuccess("");
 
     if (!form.lignePrincipale.depart || !form.lignePrincipale.arrivee) {
-      return setError("Les villes de départ et d’arrivée principales sont obligatoires.");
+      Swal.fire("Champs requis", "Veuillez indiquer le départ et l’arrivée.", "warning");
+      return;
     }
 
     try {
-      const res = await axios.post(API_URL, form, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      setSuccess("Trajet créé avec succès ✅");
+      if (editingTrajet) {
+        await api.put(`/trajets/${editingTrajet._id}`, form, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        Swal.fire("Modifié ✅", "Le trajet a été mis à jour.", "success");
+      } else {
+        await api.post("/trajets", form, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        Swal.fire("Ajouté ✅", "Le trajet a été créé avec succès.", "success");
+      }
+      setEditingTrajet(null);
       setForm({
-        lignePrincipale: { depart: "", arrivee: "", prix: "" },
-        dateDepart: "",
-        heureDepart: "",
-        heureArrivee: "",
-        totalPlaces: "",
+        compagnie: "",
+        lignePrincipale: { depart: "", arrivee: "" },
         segments: [],
+        prixTotal: "",
+        nombrePlaces: 50,
       });
       fetchTrajets();
     } catch (err) {
-      console.error("Erreur création trajet :", err);
-      setError("Erreur lors de la création du trajet !");
+      console.error("Erreur sauvegarde trajet :", err);
+      Swal.fire("Erreur", "Impossible d’enregistrer le trajet.", "error");
     }
   };
 
-  // 🔹 Suppression
-  const handleDelete = async (id) => {
-    if (!window.confirm("Supprimer ce trajet ?")) return;
+  // ✅ Édition
+  const handleEdit = (trajet) => {
+    setEditingTrajet(trajet);
+    setForm({
+      compagnie: trajet.compagnie,
+      lignePrincipale: trajet.lignePrincipale,
+      segments: trajet.segments || [],
+      prixTotal: trajet.prixTotal,
+      nombrePlaces: trajet.nombrePlaces || 50,
+    });
+  };
+
+  // ✅ Suppression
+  const handleDelete = async (trajetId) => {
+    const ask = await Swal.fire({
+      title: "Supprimer ce trajet ?",
+      text: "Cette action est irréversible.",
+      icon: "warning",
+      showCancelButton: true,
+      confirmButtonText: "Oui, supprimer",
+      cancelButtonText: "Annuler",
+    });
+
+    if (!ask.isConfirmed) return;
+
     try {
-      await axios.delete(`${API_URL}/${id}`, {
+      await api.delete(`/trajets/${trajetId}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
+      Swal.fire("Supprimé ✅", "Le trajet a été supprimé.", "success");
       fetchTrajets();
     } catch (err) {
-      console.error("Erreur suppression :", err);
-      setError("Impossible de supprimer ce trajet !");
+      console.error("Erreur suppression trajet :", err);
+      Swal.fire("Erreur", "Impossible de supprimer le trajet.", "error");
     }
   };
 
   return (
-    <section className="min-h-screen bg-gray-50 dark:bg-background-dark p-6">
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-2xl font-bold text-text-light dark:text-text-dark flex items-center gap-2">
-          <Bus className="text-primary" /> Gestion des Trajets
-        </h1>
-        <button
-          onClick={fetchTrajets}
-          className="flex items-center gap-2 bg-gray-200 dark:bg-gray-700 px-4 py-2 rounded-lg text-sm hover:bg-gray-300 dark:hover:bg-gray-600 transition"
-        >
-          <RefreshCw className="w-4 h-4" /> Actualiser
-        </button>
-      </div>
-
-      {/* 🔔 Messages */}
-      {error && <p className="text-red-500 bg-red-100 dark:bg-red-900/30 p-3 rounded mb-4">{error}</p>}
-      {success && (
-        <p className="text-green-600 bg-green-100 dark:bg-green-900/30 p-3 rounded mb-4 flex items-center gap-2">
-          <CheckCircle2 className="w-5 h-5" /> {success}
-        </p>
-      )}
-
-      {/* 🧾 Formulaire */}
-      <form
-        onSubmit={handleSubmit}
-        className="bg-white dark:bg-card-dark rounded-xl shadow-md p-6 mb-8 space-y-4"
-      >
-        <div className="grid md:grid-cols-3 gap-4">
-          <div>
-            <label className="block text-sm font-medium mb-1">Ville de départ *</label>
-            <input
-              type="text"
-              value={form.lignePrincipale.depart}
-              onChange={(e) => handleChange(e, "lignePrincipale", "depart")}
-              className="w-full border p-2 rounded-lg dark:bg-gray-800"
-              placeholder="Ex : Abidjan"
-              required
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium mb-1">Ville d’arrivée *</label>
-            <input
-              type="text"
-              value={form.lignePrincipale.arrivee}
-              onChange={(e) => handleChange(e, "lignePrincipale", "arrivee")}
-              className="w-full border p-2 rounded-lg dark:bg-gray-800"
-              placeholder="Ex : Bouaké"
-              required
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium mb-1">Prix principal</label>
-            <input
-              type="number"
-              value={form.lignePrincipale.prix}
-              onChange={(e) => handleChange(e, "lignePrincipale", "prix")}
-              className="w-full border p-2 rounded-lg dark:bg-gray-800"
-              placeholder="Ex : 10000"
-            />
-          </div>
-        </div>
-
-        <div className="grid md:grid-cols-4 gap-4 mt-4">
-          <div>
-            <label className="block text-sm font-medium mb-1">Date de départ</label>
-            <input
-              type="date"
-              value={form.dateDepart}
-              onChange={(e) => handleChange(e, "dateDepart")}
-              className="w-full border p-2 rounded-lg dark:bg-gray-800"
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium mb-1">Heure de départ</label>
-            <input
-              type="time"
-              value={form.heureDepart}
-              onChange={(e) => handleChange(e, "heureDepart")}
-              className="w-full border p-2 rounded-lg dark:bg-gray-800"
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium mb-1">
-              Heure d’arrivée (facultative)
-            </label>
-            <input
-              type="time"
-              value={form.heureArrivee}
-              onChange={(e) => handleChange(e, "heureArrivee")}
-              className="w-full border p-2 rounded-lg dark:bg-gray-800"
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium mb-1">Places totales</label>
-            <input
-              type="number"
-              value={form.totalPlaces}
-              onChange={(e) => handleChange(e, "totalPlaces")}
-              className="w-full border p-2 rounded-lg dark:bg-gray-800"
-              placeholder="Ex : 55"
-            />
-          </div>
-        </div>
-
-        {/* 🧩 Segments optionnels */}
-        <div className="mt-6">
-          <div className="flex items-center justify-between mb-2">
-            <h3 className="text-md font-semibold">Segments (optionnels)</h3>
+    <div className="flex min-h-screen bg-gray-50 dark:bg-background-dark">
+      <div className="flex-1 flex flex-col">
+        <main className="p-6 space-y-8">
+          {/* Titre */}
+          <div className="flex justify-between items-center">
+            <h2 className="text-2xl font-bold text-text-light dark:text-text-dark">
+              Gestion des trajets
+            </h2>
             <button
-              type="button"
-              onClick={addSegment}
-              className="flex items-center gap-1 bg-primary text-white px-3 py-1 rounded-lg hover:bg-primary/90 text-sm"
+              onClick={fetchTrajets}
+              className="flex items-center gap-2 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-200 px-4 py-2 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 transition"
             >
-              <Plus className="w-4 h-4" /> Ajouter un segment
+              <RefreshCw className="w-4 h-4" /> Actualiser
             </button>
           </div>
 
-          {form.segments.length === 0 && (
-            <p className="text-gray-400 italic">Aucun segment ajouté.</p>
-          )}
+          {/* Formulaire */}
+          <motion.form
+            onSubmit={handleSubmit}
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="bg-white dark:bg-card-dark p-6 rounded-xl shadow space-y-5"
+          >
+            <h3 className="text-lg font-semibold text-text-light dark:text-text-dark mb-2">
+              {editingTrajet ? "Modifier un trajet" : "Ajouter un trajet"}
+            </h3>
 
-          {form.segments.map((segment, i) => (
-            <div
-              key={i}
-              className="grid md:grid-cols-4 gap-3 bg-gray-50 dark:bg-gray-800 p-3 rounded-lg mb-2"
-            >
+            <div className="grid md:grid-cols-2 gap-4">
               <input
                 type="text"
-                placeholder="Départ"
-                value={segment.depart}
-                onChange={(e) => updateSegment(i, "depart", e.target.value)}
-                className="border p-2 rounded-lg dark:bg-gray-700"
+                name="compagnie"
+                placeholder="Nom de la compagnie"
+                value={form.compagnie}
+                onChange={handleChange}
+                required
+                className="border rounded-lg px-3 py-2 w-full bg-subtle-light dark:bg-subtle-dark focus:ring-2 focus:ring-primary outline-none"
               />
-              <input
-                type="text"
-                placeholder="Arrivée"
-                value={segment.arrivee}
-                onChange={(e) => updateSegment(i, "arrivee", e.target.value)}
-                className="border p-2 rounded-lg dark:bg-gray-700"
-              />
+
               <input
                 type="number"
-                placeholder="Prix"
-                value={segment.prix}
-                onChange={(e) => updateSegment(i, "prix", e.target.value)}
-                className="border p-2 rounded-lg dark:bg-gray-700"
+                name="prixTotal"
+                placeholder="Prix total (FCFA)"
+                value={form.prixTotal}
+                onChange={handleChange}
+                required
+                className="border rounded-lg px-3 py-2 w-full bg-subtle-light dark:bg-subtle-dark focus:ring-2 focus:ring-primary outline-none"
               />
+
+              <input
+                type="text"
+                name="depart"
+                placeholder="Ville de départ"
+                value={form.lignePrincipale.depart}
+                onChange={handleChange}
+                required
+                className="border rounded-lg px-3 py-2 w-full bg-subtle-light dark:bg-subtle-dark focus:ring-2 focus:ring-primary outline-none"
+              />
+
+              <input
+                type="text"
+                name="arrivee"
+                placeholder="Ville d'arrivée"
+                value={form.lignePrincipale.arrivee}
+                onChange={handleChange}
+                required
+                className="border rounded-lg px-3 py-2 w-full bg-subtle-light dark:bg-subtle-dark focus:ring-2 focus:ring-primary outline-none"
+              />
+
+              <input
+                type="number"
+                name="nombrePlaces"
+                placeholder="Nombre de places"
+                value={form.nombrePlaces}
+                onChange={handleChange}
+                className="border rounded-lg px-3 py-2 w-full bg-subtle-light dark:bg-subtle-dark focus:ring-2 focus:ring-primary outline-none"
+              />
+            </div>
+
+            {/* Segments */}
+            <div>
+              <h4 className="font-semibold mt-4 mb-2 text-gray-700 dark:text-gray-300">
+                Segments de trajet
+              </h4>
+              {form.segments.map((s, i) => (
+                <div
+                  key={i}
+                  className="flex flex-wrap md:flex-nowrap items-center gap-3 mb-2"
+                >
+                  <input
+                    type="text"
+                    placeholder="Départ"
+                    value={s.depart}
+                    onChange={(e) => handleSegmentChange(i, "depart", e.target.value)}
+                    className="border rounded-lg px-2 py-1 w-full md:w-1/4 bg-subtle-light dark:bg-subtle-dark"
+                  />
+                  <input
+                    type="text"
+                    placeholder="Arrivée"
+                    value={s.arrivee}
+                    onChange={(e) => handleSegmentChange(i, "arrivee", e.target.value)}
+                    className="border rounded-lg px-2 py-1 w-full md:w-1/4 bg-subtle-light dark:bg-subtle-dark"
+                  />
+                  <input
+                    type="number"
+                    placeholder="Prix"
+                    value={s.prix}
+                    onChange={(e) => handleSegmentChange(i, "prix", e.target.value)}
+                    className="border rounded-lg px-2 py-1 w-full md:w-1/4 bg-subtle-light dark:bg-subtle-dark"
+                  />
+                  <input
+                    type="text"
+                    placeholder="Durée"
+                    value={s.duree}
+                    onChange={(e) => handleSegmentChange(i, "duree", e.target.value)}
+                    className="border rounded-lg px-2 py-1 w-full md:w-1/4 bg-subtle-light dark:bg-subtle-dark"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => removeSegment(i)}
+                    className="text-red-500 hover:text-red-700"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                </div>
+              ))}
               <button
                 type="button"
-                onClick={() => removeSegment(i)}
-                className="flex items-center justify-center text-red-500 hover:text-red-700"
+                onClick={addSegment}
+                className="flex items-center gap-2 text-primary font-medium mt-2"
               >
-                <Trash2 className="w-5 h-5" />
+                <Plus className="w-4 h-4" /> Ajouter un segment
               </button>
             </div>
-          ))}
-        </div>
 
-        <button
-          type="submit"
-          className="mt-4 bg-primary text-white px-6 py-3 rounded-lg font-semibold hover:bg-primary/90 transition"
-        >
-          Enregistrer le trajet
-        </button>
-      </form>
-
-      {/* 📋 Liste des trajets existants */}
-      <div className="bg-white dark:bg-card-dark rounded-xl shadow-md p-6">
-        <h2 className="text-lg font-bold mb-4">Trajets enregistrés</h2>
-
-        {loading ? (
-          <p>Chargement...</p>
-        ) : trajets.length === 0 ? (
-          <p className="text-gray-500 italic">Aucun trajet pour le moment.</p>
-        ) : (
-          <ul className="space-y-2">
-            {trajets.map((t) => (
-              <li
-                key={t._id}
-                className="flex justify-between items-center bg-gray-50 dark:bg-gray-800 p-3 rounded-lg"
+            <div className="flex justify-end">
+              <button
+                type="submit"
+                className="flex items-center gap-2 bg-primary text-white px-5 py-2 rounded-lg hover:bg-primary/90 transition"
               >
-                <span>
-                  🚍 {t.lignePrincipale.depart} → {t.lignePrincipale.arrivee}{" "}
-                  <span className="text-sm text-gray-400 ml-2">
-                    ({t.totalPlaces} places)
-                  </span>
-                </span>
-                <button
-                  onClick={() => handleDelete(t._id)}
-                  className="text-red-500 hover:text-red-700 text-sm flex items-center gap-1"
-                >
-                  <Trash2 className="w-4 h-4" /> Supprimer
-                </button>
-              </li>
-            ))}
-          </ul>
-        )}
+                <Save className="w-4 h-4" /> {editingTrajet ? "Mettre à jour" : "Enregistrer"}
+              </button>
+            </div>
+          </motion.form>
+
+          {/* Liste des trajets */}
+          <section className="bg-white dark:bg-card-dark p-6 rounded-xl shadow">
+            <h3 className="text-lg font-semibold mb-4 text-text-light dark:text-text-dark">
+              Liste des trajets
+            </h3>
+
+            {loading ? (
+              <div className="flex justify-center items-center py-10 text-gray-500">
+                <Loader2 className="w-6 h-6 animate-spin mr-2 text-primary" />
+                Chargement des trajets...
+              </div>
+            ) : trajets.length === 0 ? (
+              <p className="text-gray-500 text-center py-6">
+                Aucun trajet enregistré.
+              </p>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="min-w-full text-sm">
+                  <thead>
+                    <tr className="bg-gray-100 dark:bg-gray-800 text-left text-gray-600 dark:text-gray-300 uppercase text-xs">
+                      <th className="py-3 px-4">Compagnie</th>
+                      <th className="py-3 px-4">Trajet</th>
+                      <th className="py-3 px-4 text-center">Prix total</th>
+                      <th className="py-3 px-4 text-center">Places</th>
+                      <th className="py-3 px-4 text-center">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {trajets.map((t) => (
+                      <motion.tr
+                        key={t._id}
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ duration: 0.2 }}
+                        className="border-b border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800 transition"
+                      >
+                        <td className="py-3 px-4">{t.compagnie}</td>
+                        <td className="py-3 px-4 flex items-center gap-2">
+                          <Bus className="w-4 h-4 text-primary" />
+                          {t.lignePrincipale.depart} → {t.lignePrincipale.arrivee}
+                        </td>
+                        <td className="py-3 px-4 text-center text-primary font-semibold">
+                          {t.prixTotal.toLocaleString()} FCFA
+                        </td>
+                        <td className="py-3 px-4 text-center">{t.nombrePlaces}</td>
+                        <td className="py-3 px-4 text-center flex justify-center gap-3">
+                          <button
+                            onClick={() => handleEdit(t)}
+                            className="text-blue-500 hover:text-blue-700 flex items-center gap-1"
+                          >
+                            <Edit className="w-4 h-4" /> Modifier
+                          </button>
+                          <button
+                            onClick={() => handleDelete(t._id)}
+                            className="text-red-500 hover:text-red-700 flex items-center gap-1"
+                          >
+                            <Trash2 className="w-4 h-4" /> Supprimer
+                          </button>
+                        </td>
+                      </motion.tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </section>
+        </main>
       </div>
-    </section>
+    </div>
   );
 };
 
 export default AdminTrajets;
-

@@ -1,51 +1,61 @@
-import React, { useState, useEffect } from "react";
-import axios from "axios";
+// src/client/admin/pages/AdminSettings.js
+import React, { useEffect, useState } from "react";
 import { motion } from "framer-motion";
-import { Save, UploadCloud, Loader2, CheckCircle2, Building2 } from "lucide-react";
-
-const API_BASE = process.env.REACT_APP_API_URL || "http://localhost:5000";
-const API_URL = `${API_BASE}/api/settings`;
+import { Save, RefreshCw, Image, Loader2, CheckCircle2, Upload } from "lucide-react";
+import Swal from "sweetalert2";
+import api from "../../utils/api";
 
 const AdminSettings = () => {
   const [settings, setSettings] = useState({
-    companyName: "",
+    compagnieName: "Kocrou Transport",
     logo: "",
-    contactEmail: "",
-    phone: "",
-    address: "",
-    workingHours: "",
+    couleurPrincipale: "#2563eb",
+    tarifParKm: 100,
+    nombrePlacesDefaut: 50,
   });
-
+  const [previewLogo, setPreviewLogo] = useState("");
   const [loading, setLoading] = useState(false);
-  const [saving, setSaving] = useState(false);
-  const [success, setSuccess] = useState(false);
-  const [error, setError] = useState("");
 
-  // 🔹 Charger les paramètres actuels
-  useEffect(() => {
-    const fetchSettings = async () => {
+  const token = localStorage.getItem("token");
+
+  // ✅ Charger les paramètres existants
+  const fetchSettings = async () => {
+    try {
       setLoading(true);
-      try {
-        const res = await axios.get(API_URL);
-        setSettings(res.data || {});
-      } catch (err) {
-        console.error("Erreur chargement paramètres :", err);
-        setError("Impossible de charger les paramètres actuels.");
-      } finally {
-        setLoading(false);
+      const { data } = await api.get("/settings", {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+
+      if (data) {
+        setSettings({
+          compagnieName: data.compagnieName || "Kocrou Transport",
+          logo: data.logo || "",
+          couleurPrincipale: data.couleurPrincipale || "#2563eb",
+          tarifParKm: data.tarifParKm || 100,
+          nombrePlacesDefaut: data.nombrePlacesDefaut || 50,
+        });
+        setPreviewLogo(data.logo || "");
       }
-    };
+    } catch (err) {
+      console.error("Erreur chargement paramètres :", err);
+      Swal.fire("Erreur", "Impossible de charger les paramètres système.", "error");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
     fetchSettings();
   }, []);
 
-  // 🔹 Gestion du changement de champ
+  // ✅ Gestion des champs texte / nombre / couleur
   const handleChange = (e) => {
     const { name, value } = e.target;
     setSettings((prev) => ({ ...prev, [name]: value }));
   };
 
-  // 🔹 Upload du logo
-  const handleFileUpload = async (e) => {
+  // ✅ Upload du logo
+  const handleLogoUpload = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
 
@@ -53,183 +63,192 @@ const AdminSettings = () => {
     formData.append("logo", file);
 
     try {
-      const res = await axios.post(`${API_URL}/upload`, formData, {
-        headers: { "Content-Type": "multipart/form-data" },
+      setLoading(true);
+      const { data } = await api.post("/settings/upload-logo", formData, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "multipart/form-data",
+        },
       });
-      setSettings((prev) => ({ ...prev, logo: res.data.url }));
+      setSettings((prev) => ({ ...prev, logo: data.url }));
+      setPreviewLogo(data.url);
+      Swal.fire("✅ Logo mis à jour", "Le logo a été téléchargé avec succès.", "success");
     } catch (err) {
       console.error("Erreur upload logo :", err);
-      setError("Échec du téléchargement du logo.");
+      Swal.fire("Erreur", "Échec du téléchargement du logo.", "error");
+    } finally {
+      setLoading(false);
     }
   };
 
-  // 🔹 Enregistrer les paramètres
-  const handleSave = async (e) => {
+  // ✅ Sauvegarde des paramètres
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    setSaving(true);
-    setError("");
-    setSuccess(false);
 
     try {
-      await axios.put(API_URL, settings);
-      setSuccess(true);
-      setTimeout(() => setSuccess(false), 2500);
+      setLoading(true);
+      await api.put("/settings", settings, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+
+      Swal.fire({
+        icon: "success",
+        title: "Paramètres sauvegardés ✅",
+        text: "Les paramètres système ont été mis à jour avec succès.",
+        timer: 2000,
+        showConfirmButton: false,
+      });
     } catch (err) {
       console.error("Erreur sauvegarde paramètres :", err);
-      setError("Impossible d’enregistrer les modifications.");
+      Swal.fire("Erreur", "Impossible d’enregistrer les paramètres.", "error");
     } finally {
-      setSaving(false);
+      setLoading(false);
     }
   };
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center min-h-[60vh] text-gray-600 dark:text-gray-300">
-        <Loader2 className="animate-spin w-8 h-8 mr-2" />
-        Chargement des paramètres...
-      </div>
-    );
-  }
-
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.4 }}
-      className="max-w-3xl mx-auto bg-white dark:bg-card-dark shadow-xl rounded-xl p-8"
-    >
-      <div className="flex items-center gap-3 mb-8">
-        <Building2 className="w-7 h-7 text-primary" />
-        <h2 className="text-2xl font-bold text-text-light dark:text-text-dark">
-          Paramètres de la compagnie
-        </h2>
+    <div className="flex min-h-screen bg-gray-50 dark:bg-background-dark">
+      <div className="flex-1 flex flex-col">
+        <main className="p-6 space-y-8">
+          {/* Titre */}
+          <div className="flex justify-between items-center">
+            <h2 className="text-2xl font-bold text-text-light dark:text-text-dark">
+              ⚙️ Paramètres Système
+            </h2>
+            <button
+              onClick={fetchSettings}
+              className="flex items-center gap-2 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-200 px-4 py-2 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 transition"
+            >
+              <RefreshCw className="w-4 h-4" /> Actualiser
+            </button>
+          </div>
+
+          {/* Formulaire principal */}
+          <motion.form
+            onSubmit={handleSubmit}
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="bg-white dark:bg-card-dark p-6 rounded-xl shadow space-y-5"
+          >
+            <div className="grid md:grid-cols-2 gap-6">
+              {/* Nom de la compagnie */}
+              <div>
+                <label className="block text-sm font-medium mb-1">
+                  Nom de la compagnie
+                </label>
+                <input
+                  type="text"
+                  name="compagnieName"
+                  value={settings.compagnieName}
+                  onChange={handleChange}
+                  className="w-full border rounded-lg px-3 py-2 bg-subtle-light dark:bg-subtle-dark focus:ring-2 focus:ring-primary outline-none"
+                  placeholder="Ex: Kocrou Transport"
+                />
+              </div>
+
+              {/* Tarif par km */}
+              <div>
+                <label className="block text-sm font-medium mb-1">
+                  Tarif par km (FCFA)
+                </label>
+                <input
+                  type="number"
+                  name="tarifParKm"
+                  value={settings.tarifParKm}
+                  onChange={handleChange}
+                  className="w-full border rounded-lg px-3 py-2 bg-subtle-light dark:bg-subtle-dark focus:ring-2 focus:ring-primary outline-none"
+                />
+              </div>
+
+              {/* Nombre de places */}
+              <div>
+                <label className="block text-sm font-medium mb-1">
+                  Nombre de places par défaut
+                </label>
+                <input
+                  type="number"
+                  name="nombrePlacesDefaut"
+                  value={settings.nombrePlacesDefaut}
+                  onChange={handleChange}
+                  className="w-full border rounded-lg px-3 py-2 bg-subtle-light dark:bg-subtle-dark focus:ring-2 focus:ring-primary outline-none"
+                />
+              </div>
+
+              {/* Couleur principale */}
+              <div>
+                <label className="block text-sm font-medium mb-1">
+                  Couleur principale
+                </label>
+                <div className="flex items-center gap-3">
+                  <input
+                    type="color"
+                    name="couleurPrincipale"
+                    value={settings.couleurPrincipale}
+                    onChange={handleChange}
+                    className="w-12 h-10 border rounded"
+                  />
+                  <span className="text-sm text-gray-500">{settings.couleurPrincipale}</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Logo */}
+            <div className="border-t border-gray-200 dark:border-gray-700 pt-5">
+              <label className="block text-sm font-medium mb-2">
+                Logo de la compagnie
+              </label>
+              <div className="flex flex-col sm:flex-row items-center gap-4">
+                {previewLogo ? (
+                  <img
+                    src={previewLogo}
+                    alt="Logo"
+                    className="w-20 h-20 object-contain border rounded-lg shadow"
+                  />
+                ) : (
+                  <div className="w-20 h-20 flex items-center justify-center bg-gray-200 dark:bg-gray-700 rounded-lg">
+                    <Image className="w-8 h-8 text-gray-500" />
+                  </div>
+                )}
+                <label className="flex items-center gap-2 cursor-pointer bg-primary text-white px-4 py-2 rounded-lg hover:bg-primary/90 transition">
+                  <Upload className="w-4 h-4" /> Importer un logo
+                  <input
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={handleLogoUpload}
+                  />
+                </label>
+              </div>
+            </div>
+
+            {/* Bouton Sauvegarde */}
+            <div className="flex justify-end pt-6">
+              <button
+                type="submit"
+                disabled={loading}
+                className="flex items-center gap-2 bg-primary text-white px-5 py-2 rounded-lg font-semibold hover:bg-primary/90 transition"
+              >
+                {loading ? (
+                  <>
+                    <Loader2 className="w-5 h-5 animate-spin" /> Enregistrement...
+                  </>
+                ) : (
+                  <>
+                    <Save className="w-5 h-5" /> Sauvegarder
+                  </>
+                )}
+              </button>
+            </div>
+          </motion.form>
+
+          {/* ✅ Indicateur de succès */}
+          <div className="flex justify-center text-green-600 dark:text-green-400 text-sm mt-4">
+            <CheckCircle2 className="w-4 h-4 mr-1" />
+            Dernière mise à jour : {new Date().toLocaleString("fr-FR")}
+          </div>
+        </main>
       </div>
-
-      <form onSubmit={handleSave} className="space-y-6">
-        <div>
-          <label className="block text-sm font-medium text-gray-600 dark:text-gray-300 mb-1">
-            Nom de la compagnie
-          </label>
-          <input
-            type="text"
-            name="companyName"
-            value={settings.companyName}
-            onChange={handleChange}
-            required
-            className="w-full p-3 border rounded-lg bg-gray-50 dark:bg-gray-700 dark:border-gray-600 focus:ring-2 focus:ring-primary outline-none"
-            placeholder="Ex: Kocrou Transport"
-          />
-        </div>
-
-        <div className="flex flex-col sm:flex-row items-center gap-4">
-          <div className="flex-1">
-            <label className="block text-sm font-medium text-gray-600 dark:text-gray-300 mb-1">
-              Logo de la compagnie
-            </label>
-            <input
-              type="file"
-              accept="image/*"
-              onChange={handleFileUpload}
-              className="block w-full text-sm text-gray-600 dark:text-gray-300"
-            />
-          </div>
-          {settings.logo && (
-            <img
-              src={settings.logo}
-              alt="Logo"
-              className="w-16 h-16 rounded-full border object-cover"
-            />
-          )}
-        </div>
-
-        <div>
-          <label className="block text-sm font-medium text-gray-600 dark:text-gray-300 mb-1">
-            Adresse e-mail de contact
-          </label>
-          <input
-            type="email"
-            name="contactEmail"
-            value={settings.contactEmail}
-            onChange={handleChange}
-            required
-            className="w-full p-3 border rounded-lg bg-gray-50 dark:bg-gray-700 dark:border-gray-600 focus:ring-2 focus:ring-primary outline-none"
-            placeholder="contact@kocrou.com"
-          />
-        </div>
-
-        <div>
-          <label className="block text-sm font-medium text-gray-600 dark:text-gray-300 mb-1">
-            Numéro de téléphone
-          </label>
-          <input
-            type="text"
-            name="phone"
-            value={settings.phone}
-            onChange={handleChange}
-            className="w-full p-3 border rounded-lg bg-gray-50 dark:bg-gray-700 dark:border-gray-600 focus:ring-2 focus:ring-primary outline-none"
-            placeholder="+225 07 00 00 00 00"
-          />
-        </div>
-
-        <div>
-          <label className="block text-sm font-medium text-gray-600 dark:text-gray-300 mb-1">
-            Adresse postale
-          </label>
-          <input
-            type="text"
-            name="address"
-            value={settings.address}
-            onChange={handleChange}
-            className="w-full p-3 border rounded-lg bg-gray-50 dark:bg-gray-700 dark:border-gray-600 focus:ring-2 focus:ring-primary outline-none"
-            placeholder="Abidjan, Plateau – Côte d’Ivoire"
-          />
-        </div>
-
-        <div>
-          <label className="block text-sm font-medium text-gray-600 dark:text-gray-300 mb-1">
-            Horaires d’ouverture
-          </label>
-          <input
-            type="text"
-            name="workingHours"
-            value={settings.workingHours}
-            onChange={handleChange}
-            className="w-full p-3 border rounded-lg bg-gray-50 dark:bg-gray-700 dark:border-gray-600 focus:ring-2 focus:ring-primary outline-none"
-            placeholder="Lun - Sam : 7h00 - 20h00"
-          />
-        </div>
-
-        {error && (
-          <p className="text-red-500 text-sm bg-red-100 dark:bg-red-900/40 p-2 rounded">
-            {error}
-          </p>
-        )}
-        {success && (
-          <div className="flex items-center gap-2 text-green-600 dark:text-green-400">
-            <CheckCircle2 className="w-5 h-5" />
-            <span>Paramètres enregistrés avec succès !</span>
-          </div>
-        )}
-
-        <button
-          type="submit"
-          disabled={saving}
-          className="w-full sm:w-auto px-6 py-3 bg-primary text-white font-semibold rounded-lg hover:bg-primary/90 transition flex items-center justify-center gap-2"
-        >
-          {saving ? (
-            <>
-              <Loader2 className="w-5 h-5 animate-spin" />
-              Enregistrement...
-            </>
-          ) : (
-            <>
-              <Save className="w-5 h-5" />
-              Enregistrer les modifications
-            </>
-          )}
-        </button>
-      </form>
-    </motion.div>
+    </div>
   );
 };
 

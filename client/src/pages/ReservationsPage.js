@@ -1,5 +1,4 @@
 import React, { useEffect, useState } from "react";
-import axios from "axios";
 import { motion } from "framer-motion";
 import {
   Loader2,
@@ -11,25 +10,20 @@ import {
   Home,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
-import Swal from "sweetalert2"; // ✅ pour les alertes modernes
-
-const API_BASE = process.env.REACT_APP_API_URL || "http://localhost:5000";
-const API_URL = `${API_BASE}/api/reservations`;
+import Swal from "sweetalert2";
+import api from "../utils/api"; // ✅ instance Axios configurée
 
 const ReservationsPage = () => {
   const [reservations, setReservations] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const navigate = useNavigate();
-  const token = localStorage.getItem("token");
 
-  // 🔹 Charger les réservations utilisateur
+  // ✅ Charger les réservations utilisateur
   const fetchReservations = async () => {
     try {
       setLoading(true);
-      const res = await axios.get(API_URL, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      const res = await api.get("/reservations");
       setReservations(res.data);
     } catch (err) {
       console.error("Erreur chargement réservations :", err);
@@ -43,7 +37,7 @@ const ReservationsPage = () => {
     fetchReservations();
   }, []);
 
-  // 🔹 Suppression (avec avertissement clair et stylé)
+  // ✅ Suppression avec confirmation SweetAlert2
   const handleDelete = async (id) => {
     const confirmation = await Swal.fire({
       title: "Supprimer cette réservation ?",
@@ -59,9 +53,7 @@ const ReservationsPage = () => {
     if (!confirmation.isConfirmed) return;
 
     try {
-      await axios.delete(`${API_URL}/${id}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      await api.delete(`/reservations/${id}`);
 
       await Swal.fire({
         title: "Réservation supprimée ✅",
@@ -70,7 +62,7 @@ const ReservationsPage = () => {
         confirmButtonColor: "#16a34a",
       });
 
-      fetchReservations();
+      fetchReservations(); // 🔄 rafraîchir la liste
     } catch (err) {
       console.error("Erreur suppression réservation :", err);
       Swal.fire({
@@ -82,6 +74,7 @@ const ReservationsPage = () => {
     }
   };
 
+  // 🌀 État de chargement
   if (loading) {
     return (
       <div className="flex flex-col justify-center items-center min-h-screen bg-background-light dark:bg-background-dark text-gray-600 dark:text-gray-300">
@@ -91,6 +84,7 @@ const ReservationsPage = () => {
     );
   }
 
+  // ⚠️ En cas d’erreur
   if (error) {
     return (
       <div className="min-h-screen flex flex-col justify-center items-center text-center">
@@ -153,11 +147,15 @@ const ReservationsPage = () => {
                       className={`text-xs mt-1 font-semibold ${
                         res.statut === "confirmée"
                           ? "text-green-600"
+                          : res.statut === "validée"
+                          ? "text-blue-600"
                           : "text-red-500"
                       }`}
                     >
                       {res.statut === "confirmée"
                         ? "✔️ Confirmée"
+                        : res.statut === "validée"
+                        ? "🟢 Validée à l’embarquement"
                         : "❌ Annulée"}
                     </p>
                   </div>
@@ -168,19 +166,19 @@ const ReservationsPage = () => {
                   {/* Voir le ticket */}
                   <button
                     onClick={() =>
-                      navigate("/confirmation", {
-                        state: { reservation: res },
-                      })
+                      navigate("/confirmation", { state: { reservation: res } })
                     }
                     className="flex items-center gap-2 px-4 py-2 bg-primary text-white rounded-lg text-sm hover:bg-primary/90 transition"
                   >
                     <Ticket className="w-4 h-4" /> Voir le ticket
                   </button>
 
-                  {/* Accueil */}
+                  {/* Retour à l’accueil */}
                   <button
                     onClick={() => navigate("/")}
-                    className="flex items-center gap-2 px-4 py-2 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg text-sm hover:bg-gray-300 dark:hover:bg-gray-600 transition"
+                    className="flex items-center gap-2 px-4 py-2 bg-gray-200 dark:bg-gray-700 
+                               text-gray-700 dark:text-gray-300 rounded-lg text-sm hover:bg-gray-300 
+                               dark:hover:bg-gray-600 transition"
                   >
                     <Home className="w-4 h-4" /> Accueil
                   </button>
@@ -189,7 +187,9 @@ const ReservationsPage = () => {
                   {res.statut === "confirmée" && (
                     <button
                       onClick={() => handleDelete(res._id)}
-                      className="flex items-center gap-2 px-4 py-2 border border-red-400 text-red-500 rounded-lg hover:bg-red-100 dark:hover:bg-red-900/20 transition text-sm"
+                      className="flex items-center gap-2 px-4 py-2 border border-red-400 
+                                 text-red-500 rounded-lg hover:bg-red-100 dark:hover:bg-red-900/20 
+                                 transition text-sm"
                     >
                       <Trash2 className="w-4 h-4" /> Annuler
                     </button>
@@ -205,3 +205,4 @@ const ReservationsPage = () => {
 };
 
 export default ReservationsPage;
+

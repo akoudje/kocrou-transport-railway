@@ -1,5 +1,5 @@
+// src/client/admin/pages/AdminUsers.js
 import React, { useEffect, useState, useContext } from "react";
-import axios from "axios";
 import { motion } from "framer-motion";
 import {
   User,
@@ -10,32 +10,32 @@ import {
   Lock,
   Search,
   ArrowUpDown,
+  Loader2,
 } from "lucide-react";
+import Swal from "sweetalert2";
+import api from "../../utils/api"; // ✅ centralisé
 import { AuthContext } from "../../context/AuthContext";
 
-const API_BASE = process.env.REACT_APP_API_URL || "http://localhost:5000";
-const API_URL = `${API_BASE}/api/users`;
-
 const AdminUsers = () => {
-  const { user } = useContext(AuthContext); // ✅ compte connecté
+  const { user } = useContext(AuthContext); // ✅ utilisateur connecté (admin)
   const [users, setUsers] = useState([]);
   const [filteredUsers, setFilteredUsers] = useState([]);
   const [searchTerm, setSearchTerm] = useState("");
-  const [sortOption, setSortOption] = useState("recent"); // 🔹 valeur de tri
+  const [sortOption, setSortOption] = useState("recent");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
   const token = localStorage.getItem("token");
 
-  // 🔹 Charger tous les utilisateurs
+  // ✅ Charger tous les utilisateurs
   const fetchUsers = async () => {
     try {
       setLoading(true);
-      const res = await axios.get(API_URL, {
+      const { data } = await api.get("/users", {
         headers: { Authorization: `Bearer ${token}` },
       });
-      setUsers(res.data);
-      setFilteredUsers(res.data);
+      setUsers(data);
+      setFilteredUsers(data);
     } catch (err) {
       console.error("Erreur chargement utilisateurs :", err);
       setError("Impossible de charger les utilisateurs.");
@@ -48,17 +48,16 @@ const AdminUsers = () => {
     fetchUsers();
   }, []);
 
-  // 🔍 Filtrage en temps réel
+  // ✅ Filtrage et tri
   useEffect(() => {
     let filtered = users.filter((u) => {
       const term = searchTerm.toLowerCase();
       return (
-        u.name.toLowerCase().includes(term) ||
-        u.email.toLowerCase().includes(term)
+        u.name?.toLowerCase().includes(term) ||
+        u.email?.toLowerCase().includes(term)
       );
     });
 
-    // 🔽 Application du tri
     if (sortOption === "admin") {
       filtered = filtered.sort((a, b) => (b.isAdmin ? 1 : 0) - (a.isAdmin ? 1 : 0));
     } else if (sortOption === "name") {
@@ -72,35 +71,60 @@ const AdminUsers = () => {
     setFilteredUsers([...filtered]);
   }, [searchTerm, users, sortOption]);
 
-  // 🔹 Supprimer un utilisateur
+  // ✅ Supprimer un utilisateur
   const handleDelete = async (id) => {
-    if (!window.confirm("Supprimer définitivement cet utilisateur ?")) return;
+    if (id === user?.id) {
+      Swal.fire("Refusé", "Vous ne pouvez pas supprimer votre propre compte.", "warning");
+      return;
+    }
+
+    const ask = await Swal.fire({
+      title: "Supprimer cet utilisateur ?",
+      text: "Cette action est irréversible.",
+      icon: "warning",
+      showCancelButton: true,
+      confirmButtonText: "Oui, supprimer",
+      cancelButtonText: "Annuler",
+    });
+
+    if (!ask.isConfirmed) return;
 
     try {
-      await axios.delete(`${API_URL}/${id}`, {
+      await api.delete(`/users/${id}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
+      Swal.fire("Supprimé ✅", "L’utilisateur a été supprimé.", "success");
       fetchUsers();
     } catch (err) {
       console.error("Erreur suppression :", err);
-      alert("Impossible de supprimer cet utilisateur !");
+      Swal.fire("Erreur", "Impossible de supprimer cet utilisateur.", "error");
     }
   };
 
-  // 🔹 Promouvoir en admin
+  // ✅ Promouvoir un utilisateur
   const handlePromote = async (id) => {
-    if (!window.confirm("Rendre cet utilisateur administrateur ?")) return;
+    const ask = await Swal.fire({
+      title: "Promouvoir en administrateur ?",
+      text: "L’utilisateur aura accès au panneau d’administration.",
+      icon: "question",
+      showCancelButton: true,
+      confirmButtonText: "Promouvoir",
+      cancelButtonText: "Annuler",
+    });
+
+    if (!ask.isConfirmed) return;
 
     try {
-      await axios.put(
-        `${API_URL}/${id}/promote`,
+      await api.put(
+        `/users/${id}/promote`,
         {},
         { headers: { Authorization: `Bearer ${token}` } }
       );
+      Swal.fire("Succès ✅", "L’utilisateur a été promu administrateur.", "success");
       fetchUsers();
     } catch (err) {
       console.error("Erreur promotion :", err);
-      alert("Impossible de promouvoir cet utilisateur !");
+      Swal.fire("Erreur", "Impossible de promouvoir cet utilisateur.", "error");
     }
   };
 
@@ -108,14 +132,14 @@ const AdminUsers = () => {
     <div className="flex min-h-screen bg-gray-50 dark:bg-background-dark">
       <div className="flex-1 flex flex-col">
         <main className="p-6">
-          {/* 🧭 En-tête avec recherche et tri */}
+          {/* 🧭 En-tête */}
           <div className="flex flex-col sm:flex-row justify-between items-center mb-6 gap-4">
             <h2 className="text-2xl font-bold text-text-light dark:text-text-dark">
               Liste des utilisateurs
             </h2>
 
             <div className="flex flex-wrap gap-3 items-center">
-              {/* 🔍 Barre de recherche */}
+              {/* 🔍 Recherche */}
               <div className="flex items-center gap-2 w-72 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg px-3 py-2 shadow-sm">
                 <Search className="text-gray-400 w-4 h-4" />
                 <input
@@ -127,7 +151,7 @@ const AdminUsers = () => {
                 />
               </div>
 
-              {/* 🔽 Sélecteur de tri */}
+              {/* 🔽 Tri */}
               <div className="flex items-center gap-2 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg px-3 py-2 shadow-sm">
                 <ArrowUpDown className="w-4 h-4 text-gray-500" />
                 <select
@@ -141,7 +165,7 @@ const AdminUsers = () => {
                 </select>
               </div>
 
-              {/* 🔁 Bouton actualiser */}
+              {/* 🔁 Actualiser */}
               <button
                 onClick={fetchUsers}
                 className="flex items-center gap-2 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-200 px-4 py-2 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 transition"
@@ -153,13 +177,13 @@ const AdminUsers = () => {
 
           {/* 🧱 Tableau principal */}
           {loading ? (
-            <p className="text-gray-500">Chargement des utilisateurs...</p>
+            <div className="flex justify-center items-center py-20 text-gray-500 dark:text-gray-400">
+              <Loader2 className="w-6 h-6 mr-2 animate-spin text-primary" /> Chargement...
+            </div>
           ) : error ? (
             <p className="text-red-500">{error}</p>
           ) : filteredUsers.length === 0 ? (
-            <p className="text-gray-500 text-center py-10">
-              Aucun utilisateur trouvé.
-            </p>
+            <p className="text-gray-500 text-center py-10">Aucun utilisateur trouvé.</p>
           ) : (
             <div className="overflow-x-auto bg-white dark:bg-card-dark rounded-xl shadow">
               <table className="min-w-full text-sm">
@@ -208,7 +232,7 @@ const AdminUsers = () => {
                           )}
                         </td>
                         <td className="py-3 px-4 text-center text-gray-400">
-                          {new Date(u.createdAt).toLocaleDateString()}
+                          {new Date(u.createdAt).toLocaleDateString("fr-FR")}
                         </td>
                         <td className="py-3 px-4 text-center flex justify-center gap-3">
                           {isCurrentUser ? (
@@ -253,5 +277,3 @@ const AdminUsers = () => {
 };
 
 export default AdminUsers;
-
-

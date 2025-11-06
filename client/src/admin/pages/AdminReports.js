@@ -1,273 +1,256 @@
 import React, { useEffect, useState } from "react";
-import axios from "axios";
+import { motion } from "framer-motion";
+import {
+  FileText,
+  Loader2,
+  Download,
+  BarChart3,
+  PieChart,
+  CalendarDays,
+} from "lucide-react";
+import Swal from "sweetalert2";
+import * as XLSX from "xlsx";
+import jsPDF from "jspdf";
+import "jspdf-autotable";
+import api from "../../utils/api";
 import {
   BarChart,
   Bar,
   XAxis,
   YAxis,
   Tooltip,
+  Legend,
   ResponsiveContainer,
-  LineChart,
-  Line,
-  CartesianGrid,
+  Pie,
+  PieChart as RPieChart,
+  Cell,
 } from "recharts";
-import { motion } from "framer-motion";
-import { FileDown, CalendarDays, RefreshCw } from "lucide-react";
-import jsPDF from "jspdf";
-import "jspdf-autotable";
-import * as XLSX from "xlsx";
-
-const API_BASE = process.env.REACT_APP_API_URL || "http://localhost:5000";
-const API_URL = `${API_BASE}/api/admin/reservations`;
 
 const AdminReports = () => {
-  const [reservations, setReservations] = useState([]);
+  const [reportData, setReportData] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
-  const [startDate, setStartDate] = useState("");
-  const [endDate, setEndDate] = useState("");
-  const [filteredData, setFilteredData] = useState([]);
-
+  const [monthFilter, setMonthFilter] = useState("");
   const token = localStorage.getItem("token");
 
-  // 🔹 Charger toutes les réservations
-  const fetchReservations = async () => {
+  // 🎯 Charger les données du backend
+  const fetchReport = async () => {
     try {
       setLoading(true);
-      const res = await axios.get(API_URL, {
+      const { data } = await api.get(`/reports?month=${monthFilter}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
-      setReservations(res.data);
-      setFilteredData(res.data);
+      setReportData(data);
     } catch (err) {
-      console.error("Erreur récupération réservations :", err);
-      setError("Impossible de charger les données.");
+      console.error("Erreur chargement rapport :", err);
+      Swal.fire("Erreur", "Impossible de charger les rapports.", "error");
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    fetchReservations();
-  }, []);
+    fetchReport();
+  }, [monthFilter]);
 
-  // 🔹 Filtrage par période
-  const handleFilter = () => {
-    if (!startDate || !endDate) {
-      setFilteredData(reservations);
-      return;
-    }
+  // 📊 Génération Excel
+  const exportToExcel = () => {
+    if (!reportData) return;
+    const wb = XLSX.utils.book_new();
 
-    const start = new Date(startDate);
-    const end = new Date(endDate);
+    const reservationsSheet = XLSX.utils.json_to_sheet(reportData.reservations);
+    XLSX.utils.book_append_sheet(wb, reservationsSheet, "Réservations");
 
-    const filtered = reservations.filter((res) => {
-      const date = new Date(res.date);
-      return date >= start && date <= end;
-    });
+    const statsSheet = XLSX.utils.json_to_sheet([
+      {
+        "Total Réservations": reportData.totalReservations,
+        "Total Revenus": `${reportData.totalRevenue} FCFA`,
+        "Réservations Validées": reportData.validatedCount,
+        "Réservations Annulées": reportData.cancelledCount,
+      },
+    ]);
+    XLSX.utils.book_append_sheet(wb, statsSheet, "Statistiques");
 
-    setFilteredData(filtered);
+    XLSX.writeFile(wb, "rapport_kocrou_transport.xlsx");
   };
 
-  // 🔹 Calculs des revenus et volume
-  const stats = filteredData.reduce(
-    (acc, r) => {
-      acc.total += r.trajet?.prix || 0;
-      acc.count += 1;
-      return acc;
-    },
-    { total: 0, count: 0 }
-  );
-
-  // 🔹 Préparation des données pour Recharts
-  const revenueByDate = filteredData.reduce((acc, r) => {
-    const d = new Date(r.date).toLocaleDateString("fr-FR");
-    const existing = acc.find((x) => x.date === d);
-    if (existing) existing.total += r.trajet?.prix || 0;
-    else acc.push({ date: d, total: r.trajet?.prix || 0 });
-    return acc;
-  }, []);
-
-  // 🔹 Export Excel
-  const exportExcel = () => {
-    const worksheet = XLSX.utils.json_to_sheet(
-      filteredData.map((r) => ({
-        Client: r.user?.name || "Inconnu",
-        Compagnie: r.trajet?.compagnie,
-        Départ: r.trajet?.villeDepart,
-        Arrivée: r.trajet?.villeArrivee,
-        Prix: r.trajet?.prix,
-        Siège: r.seat,
-        Date: new Date(r.date).toLocaleString(),
-        Statut: r.statut,
-      }))
+  // 📄 Génération PDF
+  const exportToPDF = () => {
+    if (!reportData) return;
+    const doc = new jsPDF();
+    doc.setFontSize(14);
+    doc.text("Rapport Kocrou Transport", 14, 20);
+    doc.text(
+      `Période : ${monthFilter || "Tous les mois"} - Généré le ${new Date().toLocaleDateString(
+        "fr-FR"
+      )}`,
+      14,
+      28
     );
 
-    const workbook = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(workbook, worksheet, "Réservations");
-    XLSX.writeFile(workbook, "rapport_reservations.xlsx");
+    doc.autoTable({
+      startY: 35,
+      head: [["Type", "Valeur"]],
+      body: [
+        ["Total Réservations", reportData.totalReservations],
+        ["Total Revenus", `${reportData.totalRevenue} FCFA`],
+        ["Validées", reportData.validatedCount],
+        ["Annulées", reportData.cancelledCount],
+      ],
+    });
+
+    doc.save("rapport_kocrou_transport.pdf");
   };
 
-  // 🔹 Export PDF
-  const exportPDF = () => {
-    const doc = new jsPDF();
-    doc.text("Rapport des réservations", 14, 15);
-    doc.autoTable({
-      head: [["Client", "Trajet", "Prix (FCFA)", "Date", "Statut"]],
-      body: filteredData.map((r) => [
-        r.user?.name || "Inconnu",
-        `${r.trajet?.villeDepart} → ${r.trajet?.villeArrivee}`,
-        r.trajet?.prix?.toLocaleString(),
-        new Date(r.date).toLocaleDateString("fr-FR"),
-        r.statut,
-      ]),
-      startY: 25,
-    });
-    doc.save("rapport_reservations.pdf");
-  };
+  const COLORS = ["#3B82F6", "#10B981", "#F59E0B", "#EF4444"];
 
   return (
-    <div className="flex-1 p-6 bg-gray-50 dark:bg-background-dark">
-      {/* 🔹 Header */}
-      <div className="flex justify-between items-center mb-6">
-        <h2 className="text-2xl font-bold text-text-light dark:text-text-dark">
-          📊 Rapports et statistiques
-        </h2>
-        <button
-          onClick={fetchReservations}
-          className="flex items-center gap-2 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-200 px-4 py-2 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 transition"
-        >
-          <RefreshCw className="w-4 h-4" /> Actualiser
-        </button>
-      </div>
+    <div className="min-h-screen bg-gray-50 dark:bg-background-dark p-6">
+      <motion.div
+        initial={{ opacity: 0, y: 30 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.5 }}
+        className="max-w-6xl mx-auto"
+      >
+        {/* 🔹 En-tête */}
+        <div className="flex flex-col md:flex-row justify-between items-center gap-4 mb-8">
+          <h1 className="text-2xl font-bold text-text-light dark:text-text-dark flex items-center gap-2">
+            <FileText className="w-6 h-6 text-primary" /> Rapports & Statistiques
+          </h1>
 
-      {/* 🔹 Filtres */}
-      <div className="flex flex-col md:flex-row items-center gap-4 mb-8">
-        <div className="flex items-center gap-2">
-          <CalendarDays className="w-4 h-4 text-gray-400" />
-          <input
-            type="date"
-            value={startDate}
-            onChange={(e) => setStartDate(e.target.value)}
-            className="px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-card-dark text-gray-700 dark:text-gray-200"
-          />
+          <div className="flex flex-wrap gap-3 items-center">
+            <div className="flex items-center gap-2">
+              <CalendarDays className="text-primary w-4 h-4" />
+              <input
+                type="month"
+                value={monthFilter}
+                onChange={(e) => setMonthFilter(e.target.value)}
+                className="border rounded-lg px-3 py-2 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300"
+              />
+            </div>
+
+            <button
+              onClick={fetchReport}
+              className="px-4 py-2 bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 transition"
+            >
+              Actualiser
+            </button>
+
+            <button
+              onClick={exportToExcel}
+              className="flex items-center gap-2 px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition"
+            >
+              <Download className="w-4 h-4" /> Excel
+            </button>
+
+            <button
+              onClick={exportToPDF}
+              className="flex items-center gap-2 px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition"
+            >
+              <Download className="w-4 h-4" /> PDF
+            </button>
+          </div>
         </div>
-        <span>→</span>
-        <div className="flex items-center gap-2">
-          <CalendarDays className="w-4 h-4 text-gray-400" />
-          <input
-            type="date"
-            value={endDate}
-            onChange={(e) => setEndDate(e.target.value)}
-            className="px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-lg bg-white dark:bg-card-dark text-gray-700 dark:text-gray-200"
-          />
-        </div>
-        <button
-          onClick={handleFilter}
-          className="bg-primary text-white px-5 py-2 rounded-lg hover:bg-primary/90 transition"
-        >
-          Filtrer
-        </button>
-      </div>
 
-      {/* 🔹 Statistiques globales */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 mb-10">
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="bg-white dark:bg-card-dark p-6 rounded-xl shadow"
-        >
-          <h3 className="text-gray-500 text-sm mb-2">Revenus totaux</h3>
-          <p className="text-3xl font-bold text-primary">
-            {stats.total.toLocaleString()} FCFA
-          </p>
-        </motion.div>
-
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="bg-white dark:bg-card-dark p-6 rounded-xl shadow"
-        >
-          <h3 className="text-gray-500 text-sm mb-2">Nombre de réservations</h3>
-          <p className="text-3xl font-bold text-primary">{stats.count}</p>
-        </motion.div>
-
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="bg-white dark:bg-card-dark p-6 rounded-xl shadow"
-        >
-          <h3 className="text-gray-500 text-sm mb-2">Période sélectionnée</h3>
-          <p className="text-md font-semibold text-gray-700 dark:text-gray-300">
-            {startDate && endDate
-              ? `${new Date(startDate).toLocaleDateString()} → ${new Date(
-                  endDate
-                ).toLocaleDateString()}`
-              : "Toutes les dates"}
-          </p>
-        </motion.div>
-      </div>
-
-      {/* 📊 Graphique : Revenus par date */}
-      <div className="bg-white dark:bg-card-dark p-6 rounded-xl shadow mb-10">
-        <h3 className="text-lg font-semibold mb-4 text-text-light dark:text-text-dark">
-          Revenus par jour
-        </h3>
-        {revenueByDate.length === 0 ? (
-          <p className="text-gray-500 text-center py-10">
-            Aucune donnée à afficher pour cette période.
+        {/* 🧾 Contenu */}
+        {loading ? (
+          <div className="flex justify-center items-center py-20 text-gray-500 dark:text-gray-400">
+            <Loader2 className="animate-spin w-6 h-6 mr-2 text-primary" />
+            Chargement des rapports...
+          </div>
+        ) : !reportData ? (
+          <p className="text-center text-gray-500 dark:text-gray-400 py-20">
+            Aucun rapport disponible 📭
           </p>
         ) : (
-          <ResponsiveContainer width="100%" height={300}>
-            <LineChart data={revenueByDate}>
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis dataKey="date" />
-              <YAxis />
-              <Tooltip />
-              <Line
-                type="monotone"
-                dataKey="total"
-                stroke="#3b82f6"
-                strokeWidth={3}
+          <>
+            {/* 🔸 Statistiques globales */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-10">
+              <StatCard
+                title="Total Réservations"
+                value={reportData.totalReservations}
+                color="text-blue-500"
               />
-            </LineChart>
-          </ResponsiveContainer>
+              <StatCard
+                title="Revenus Totaux"
+                value={`${reportData.totalRevenue.toLocaleString()} FCFA`}
+                color="text-green-500"
+              />
+              <StatCard
+                title="Validées"
+                value={reportData.validatedCount}
+                color="text-emerald-500"
+              />
+              <StatCard
+                title="Annulées"
+                value={reportData.cancelledCount}
+                color="text-red-500"
+              />
+            </div>
+
+            {/* 📊 Graphiques */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-10">
+              {/* 🔹 Histogramme */}
+              <div className="bg-white dark:bg-card-dark p-6 rounded-xl shadow-md">
+                <h3 className="font-semibold text-lg mb-4 text-gray-700 dark:text-gray-200 flex items-center gap-2">
+                  <BarChart3 className="w-5 h-5 text-primary" /> Réservations par jour
+                </h3>
+                <ResponsiveContainer width="100%" height={300}>
+                  <BarChart data={reportData.dailyStats}>
+                    <XAxis dataKey="date" />
+                    <YAxis />
+                    <Tooltip />
+                    <Legend />
+                    <Bar dataKey="confirmées" fill="#3B82F6" />
+                    <Bar dataKey="annulées" fill="#EF4444" />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+
+              {/* 🔸 Diagramme circulaire */}
+              <div className="bg-white dark:bg-card-dark p-6 rounded-xl shadow-md">
+                <h3 className="font-semibold text-lg mb-4 text-gray-700 dark:text-gray-200 flex items-center gap-2">
+                  <PieChart className="w-5 h-5 text-primary" /> Répartition des statuts
+                </h3>
+                <ResponsiveContainer width="100%" height={300}>
+                  <RPieChart>
+                    <Pie
+                      dataKey="value"
+                      data={[
+                        { name: "Confirmées", value: reportData.validatedCount },
+                        { name: "Annulées", value: reportData.cancelledCount },
+                      ]}
+                      cx="50%"
+                      cy="50%"
+                      outerRadius={100}
+                      label
+                    >
+                      {COLORS.map((c, i) => (
+                        <Cell key={`cell-${i}`} fill={c} />
+                      ))}
+                    </Pie>
+                    <Tooltip />
+                  </RPieChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
+          </>
         )}
-      </div>
-
-      {/* 📊 Graphique : Volume de réservations */}
-      <div className="bg-white dark:bg-card-dark p-6 rounded-xl shadow mb-10">
-        <h3 className="text-lg font-semibold mb-4 text-text-light dark:text-text-dark">
-          Nombre de réservations par jour
-        </h3>
-        <ResponsiveContainer width="100%" height={300}>
-          <BarChart data={revenueByDate}>
-            <CartesianGrid strokeDasharray="3 3" />
-            <XAxis dataKey="date" />
-            <YAxis />
-            <Tooltip />
-            <Bar dataKey="total" fill="#16a34a" />
-          </BarChart>
-        </ResponsiveContainer>
-      </div>
-
-      {/* 📁 Export */}
-      <div className="flex justify-center gap-4 mt-8">
-        <button
-          onClick={exportPDF}
-          className="bg-red-500 text-white px-5 py-3 rounded-lg hover:bg-red-600 flex items-center gap-2 transition"
-        >
-          <FileDown className="w-5 h-5" /> Exporter en PDF
-        </button>
-        <button
-          onClick={exportExcel}
-          className="bg-green-600 text-white px-5 py-3 rounded-lg hover:bg-green-700 flex items-center gap-2 transition"
-        >
-          <FileDown className="w-5 h-5" /> Exporter en Excel
-        </button>
-      </div>
+      </motion.div>
     </div>
   );
 };
+
+// 🧩 Composant carte de statistiques
+const StatCard = ({ title, value, color }) => (
+  <motion.div
+    initial={{ opacity: 0, y: 10 }}
+    animate={{ opacity: 1, y: 0 }}
+    transition={{ duration: 0.3 }}
+    className="bg-white dark:bg-card-dark p-6 rounded-xl shadow-md text-center"
+  >
+    <h4 className="text-gray-500 dark:text-gray-400 text-sm">{title}</h4>
+    <p className={`text-2xl font-bold ${color}`}>{value}</p>
+  </motion.div>
+);
 
 export default AdminReports;

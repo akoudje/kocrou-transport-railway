@@ -1,53 +1,96 @@
 import React, { useEffect, useRef, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import axios from "axios";
 import { motion } from "framer-motion";
 import { QRCodeCanvas } from "qrcode.react";
-import { ArrowLeft, Download, FileDown, CheckCircle2, Loader2 } from "lucide-react";
 import html2canvas from "html2canvas";
 import jsPDF from "jspdf";
 import Swal from "sweetalert2";
-
-const API_BASE = process.env.REACT_APP_API_URL || "http://localhost:5000";
-const API_URL = `${API_BASE}/api/reservations/admin/reservations`;
+import {
+  ArrowLeft,
+  Download,
+  FileDown,
+  CheckCircle2,
+  Loader2,
+} from "lucide-react";
+import api from "../../utils/api"; // ✅ utilise la config API centralisée
 
 const AdminTicketView = () => {
   const { id } = useParams();
   const navigate = useNavigate();
   const ticketRef = useRef();
-  const token = localStorage.getItem("token");
-
   const [reservation, setReservation] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  // Charger la réservation sélectionnée
-  const fetchReservation = async () => {
+  // 🔹 Charger la réservation spécifique
+  useEffect(() => {
+    const fetchReservation = async () => {
+      try {
+        const { data } = await api.get(`/reservations/admin/reservations`);
+        const found = data.find((r) => r._id === id);
+        setReservation(found || null);
+      } catch (err) {
+        console.error("Erreur chargement réservation :", err);
+        Swal.fire("Erreur", "Impossible de charger le billet.", "error");
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchReservation();
+  }, [id]);
+
+  // 🔹 Validation à l’embarquement
+  const handleValidate = async () => {
+    const ask = await Swal.fire({
+      title: "Valider à l’embarquement ?",
+      text: "Cette action confirmera que le passager est monté dans le bus.",
+      icon: "question",
+      showCancelButton: true,
+      confirmButtonText: "Valider",
+      cancelButtonText: "Annuler",
+    });
+
+    if (!ask.isConfirmed) return;
+
     try {
-      const res = await axios.get(`${API_BASE}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      const found = res.data.find((r) => r._id === id);
-      setReservation(found || null);
+      await api.put(`/reservations/admin/reservations/${id}/validate`);
+      Swal.fire("Validée ✅", "Le billet a été validé à l’embarquement.", "success");
+      setReservation((prev) => ({ ...prev, statut: "validée" }));
     } catch (err) {
-      console.error("Erreur chargement réservation :", err);
-      Swal.fire("Erreur", "Impossible de charger le billet.", "error");
-    } finally {
-      setLoading(false);
+      console.error("Erreur validation :", err);
+      Swal.fire("Erreur", "Impossible de valider l’embarquement.", "error");
     }
   };
 
-  useEffect(() => {
-    fetchReservation();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [id]);
+  // 🔹 Télécharger en image
+  const handleDownloadImage = async () => {
+    const canvas = await html2canvas(ticketRef.current, { scale: 2 });
+    const link = document.createElement("a");
+    link.download = `ticket-${reservation.trajet?.villeDepart}-${reservation.trajet?.villeArrivee}.png`;
+    link.href = canvas.toDataURL("image/png");
+    link.click();
+  };
 
-  if (loading)
+  // 🔹 Télécharger en PDF
+  const handleDownloadPDF = async () => {
+    const canvas = await html2canvas(ticketRef.current, { scale: 2 });
+    const imgData = canvas.toDataURL("image/png");
+    const pdf = new jsPDF({ orientation: "portrait", unit: "px", format: "a4" });
+    const width = pdf.internal.pageSize.getWidth();
+    const height = (canvas.height * width) / canvas.width;
+    pdf.addImage(imgData, "PNG", 0, 0, width, height);
+    pdf.save(
+      `ticket-${reservation.trajet?.villeDepart}-${reservation.trajet?.villeArrivee}.pdf`
+    );
+  };
+
+  if (loading) {
     return (
       <div className="flex flex-col justify-center items-center min-h-screen bg-background-light dark:bg-background-dark text-gray-600 dark:text-gray-300">
         <Loader2 className="animate-spin w-8 h-8 mb-3 text-primary" />
         Chargement du billet...
       </div>
     );
+  }
 
   if (!reservation) {
     return (
@@ -64,49 +107,6 @@ const AdminTicketView = () => {
   }
 
   const { trajet, seat, date, user, statut } = reservation;
-
-  // ✅ Télécharger en image
-  const handleDownloadImage = async () => {
-    const canvas = await html2canvas(ticketRef.current, { scale: 2 });
-    const link = document.createElement("a");
-    link.download = `ticket-${trajet.villeDepart}-${trajet.villeArrivee}.png`;
-    link.href = canvas.toDataURL("image/png");
-    link.click();
-  };
-
-  // ✅ Télécharger en PDF
-  const handleDownloadPDF = async () => {
-    const canvas = await html2canvas(ticketRef.current, { scale: 2 });
-    const imgData = canvas.toDataURL("image/png");
-    const pdf = new jsPDF({ orientation: "portrait", unit: "px", format: "a4" });
-    const width = pdf.internal.pageSize.getWidth();
-    const height = (canvas.height * width) / canvas.width;
-    pdf.addImage(imgData, "PNG", 0, 0, width, height);
-    pdf.save(`ticket-${trajet.villeDepart}-${trajet.villeArrivee}.pdf`);
-  };
-
-  // ✅ Validation à l'embarquement
-  const handleValidate = async () => {
-    const ask = await Swal.fire({
-      title: "Valider à l’embarquement ?",
-      text: "Cette action confirmera que le passager est monté dans le bus.",
-      icon: "question",
-      showCancelButton: true,
-      confirmButtonText: "Valider",
-      cancelButtonText: "Annuler",
-    });
-
-    if (!ask.isConfirmed) return;
-
-    try {
-      await axios.put(`${API_BASE}/${id}/validate`, {}, { headers: { Authorization: `Bearer ${token}` } });
-      Swal.fire("Validée ✅", "Le billet a été validé à l’embarquement.", "success");
-      fetchReservation();
-    } catch (err) {
-      console.error("Erreur validation :", err);
-      Swal.fire("Erreur", "Impossible de valider l’embarquement.", "error");
-    }
-  };
 
   return (
     <section className="min-h-screen bg-background-light dark:bg-background-dark py-10 px-6">
@@ -158,7 +158,7 @@ const AdminTicketView = () => {
             </div>
           </div>
 
-          {/* Ligne principale */}
+          {/* Détails */}
           <div className="flex flex-col gap-2">
             <p className="text-sm text-gray-500">Client :</p>
             <h3 className="text-lg font-semibold text-text-light dark:text-white mb-2">
@@ -182,7 +182,7 @@ const AdminTicketView = () => {
             </p>
 
             <div className="mt-3 text-primary font-bold text-xl">
-              {trajet.prix.toLocaleString()} FCFA
+              {trajet.prix?.toLocaleString()} FCFA
             </div>
 
             <p
@@ -194,19 +194,19 @@ const AdminTicketView = () => {
                   : "text-red-600"
               }`}
             >
-              Statut : {statut.toUpperCase()}
+              Statut : {statut?.toUpperCase()}
             </p>
           </div>
 
-          {/* Ligne de détachement */}
+          {/* Code réservation */}
           <div className="my-6 border-t-2 border-dashed border-gray-300 relative">
             <span className="absolute -top-3 left-0 w-5 h-5 bg-background-light dark:bg-background-dark rounded-full"></span>
             <span className="absolute -top-3 right-0 w-5 h-5 bg-background-light dark:bg-background-dark rounded-full"></span>
           </div>
 
-          {/* Code de réservation */}
           <div className="text-center text-sm text-gray-500 mt-4">
-            Code : <span className="font-mono font-bold text-primary">
+            Code :{" "}
+            <span className="font-mono font-bold text-primary">
               {`KOC-${trajet.villeDepart.substring(0, 3).toUpperCase()}-${trajet.villeArrivee
                 .substring(0, 3)
                 .toUpperCase()}-${seat}`}

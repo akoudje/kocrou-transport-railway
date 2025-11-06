@@ -1,23 +1,20 @@
+// src/client/admin/pages/AdminDashboard.js
 import React, { useEffect, useState } from "react";
-import axios from "axios";
 import {
-  BarChart,
-  Bar,
   LineChart,
   Line,
+  PieChart,
+  Pie,
+  Cell,
   CartesianGrid,
   XAxis,
   YAxis,
   Tooltip,
-  ResponsiveContainer,
-  PieChart,
-  Pie,
-  Cell,
   Legend,
+  ResponsiveContainer,
 } from "recharts";
 import { Users, Bus, DollarSign, Calendar } from "lucide-react";
-
-const API_BASE = process.env.REACT_APP_API_URL || "http://localhost:5000";
+import api from "../../utils/api"; // ✅ centralisé
 
 const AdminDashboard = () => {
   const [stats, setStats] = useState({
@@ -28,62 +25,82 @@ const AdminDashboard = () => {
   });
   const [reservationsByMonth, setReservationsByMonth] = useState([]);
   const [topDestinations, setTopDestinations] = useState([]);
+  const [loading, setLoading] = useState(true);
 
   const token = localStorage.getItem("token");
 
+  // ✅ Chargement des données globales
+  const fetchDashboardData = async () => {
+    try {
+      setLoading(true);
+
+      const [usersRes, trajetsRes, reservationsRes] = await Promise.all([
+        api.get("/users", { headers: { Authorization: `Bearer ${token}` } }),
+        api.get("/trajets", { headers: { Authorization: `Bearer ${token}` } }),
+        api.get("/reservations", { headers: { Authorization: `Bearer ${token}` } }),
+      ]);
+
+      const users = usersRes.data.length;
+      const trajets = trajetsRes.data.length;
+      const reservations = reservationsRes.data.length;
+
+      const revenue = reservationsRes.data.reduce(
+        (sum, r) => sum + (r.trajet?.prix || r.segment?.prix || 0),
+        0
+      );
+
+      // ✅ Réservations par mois
+      const monthly = {};
+      reservationsRes.data.forEach((r) => {
+        const month = new Date(r.dateReservation).toLocaleString("fr-FR", {
+          month: "short",
+        });
+        monthly[month] = (monthly[month] || 0) + 1;
+      });
+
+      // ✅ Top destinations
+      const destinations = {};
+      reservationsRes.data.forEach((r) => {
+        const dest = r.trajet?.villeArrivee || r.segment?.arrivee || "Inconnue";
+        destinations[dest] = (destinations[dest] || 0) + 1;
+      });
+
+      setStats({ users, trajets, reservations, revenue });
+      setReservationsByMonth(
+        Object.entries(monthly).map(([mois, total]) => ({ mois, total }))
+      );
+      setTopDestinations(
+        Object.entries(destinations)
+          .map(([ville, total]) => ({ ville, total }))
+          .sort((a, b) => b.total - a.total)
+          .slice(0, 5)
+      );
+    } catch (err) {
+      console.error("Erreur dashboard:", err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   useEffect(() => {
-    const fetchDashboardData = async () => {
-      try {
-        const [usersRes, trajetsRes, reservationsRes] = await Promise.all([
-          axios.get(`${API_BASE}/users`, { headers: { Authorization: `Bearer ${token}` } }),
-          axios.get(`${API_BASE}/trajets`, { headers: { Authorization: `Bearer ${token}` } }),
-          axios.get(`${API_BASE}/reservations`, { headers: { Authorization: `Bearer ${token}` } }),
-        ]);
-
-        const users = usersRes.data.length;
-        const trajets = trajetsRes.data.length;
-        const reservations = reservationsRes.data.length;
-        const revenue = reservationsRes.data.reduce((sum, r) => sum + (r.segment?.prix || 0), 0);
-
-        // Répartition des réservations par mois
-        const monthly = {};
-        reservationsRes.data.forEach((r) => {
-          const month = new Date(r.dateReservation).toLocaleString("fr-FR", { month: "short" });
-          monthly[month] = (monthly[month] || 0) + 1;
-        });
-
-        // Top destinations
-        const destinations = {};
-        reservationsRes.data.forEach((r) => {
-          const dest = r.segment?.arrivee || "Inconnue";
-          destinations[dest] = (destinations[dest] || 0) + 1;
-        });
-
-        setStats({ users, trajets, reservations, revenue });
-        setReservationsByMonth(
-          Object.entries(monthly).map(([mois, total]) => ({ mois, total }))
-        );
-        setTopDestinations(
-          Object.entries(destinations)
-            .map(([ville, total]) => ({ ville, total }))
-            .sort((a, b) => b.total - a.total)
-            .slice(0, 5)
-        );
-      } catch (err) {
-        console.error("Erreur dashboard:", err);
-      }
-    };
-
     fetchDashboardData();
-  }, [token]);
+  }, []);
 
   const COLORS = ["#2563eb", "#10b981", "#f59e0b", "#ef4444", "#8b5cf6"];
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen text-gray-500 dark:text-gray-300">
+        Chargement des statistiques...
+      </div>
+    );
+  }
 
   return (
     <div className="flex min-h-screen bg-gray-50 dark:bg-background-dark">
       <div className="flex-1 flex flex-col">
         <main className="p-6 space-y-10">
-          {/* Cartes de stats principales */}
+          {/* 🔹 Cartes de statistiques */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
             <div className="p-5 bg-white dark:bg-card-dark rounded-xl shadow flex items-center justify-between">
               <div>
@@ -126,7 +143,7 @@ const AdminDashboard = () => {
             </div>
           </div>
 
-          {/* Graphique 1 : Réservations par mois */}
+          {/* 📈 Graphique : Réservations par mois */}
           <div className="bg-white dark:bg-card-dark rounded-xl p-6 shadow">
             <h3 className="text-lg font-semibold mb-4 text-text-light dark:text-text-dark">
               Réservations par mois
@@ -142,7 +159,7 @@ const AdminDashboard = () => {
             </ResponsiveContainer>
           </div>
 
-          {/* Graphique 2 : Top 5 destinations */}
+          {/* 🥇 Graphique : Top 5 destinations */}
           <div className="bg-white dark:bg-card-dark rounded-xl p-6 shadow">
             <h3 className="text-lg font-semibold mb-4 text-text-light dark:text-text-dark">
               Top 5 destinations
@@ -174,4 +191,3 @@ const AdminDashboard = () => {
 };
 
 export default AdminDashboard;
-

@@ -1,11 +1,13 @@
-import React, { useState } from "react";
-import axios from "axios";
+import React, { useState, useContext } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import { UserPlus, Loader2 } from "lucide-react";
+import Swal from "sweetalert2";
+import { AuthContext } from "../context/AuthContext";
 
 const RegisterPage = () => {
   const navigate = useNavigate();
+  const { register, loading, error } = useContext(AuthContext);
 
   const [form, setForm] = useState({
     name: "",
@@ -13,36 +15,31 @@ const RegisterPage = () => {
     password: "",
   });
 
-  const [loading, setLoading] = useState(false);
-  const [message, setMessage] = useState("");
-
   // 🧩 Gestion des champs du formulaire
-  const handleChange = (e) =>
-    setForm({ ...form, [e.target.name]: e.target.value });
+  const handleChange = (e) => setForm({ ...form, [e.target.name]: e.target.value });
 
-  // 🚀 Envoi du formulaire d’inscription
+  // 🚀 Soumission du formulaire
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setLoading(true);
-    setMessage("");
 
-    try {
-      // ⚙️ Appel vers le backend (grâce au proxy dans package.json)
-      const res = await axios.post("/api/auth/register", form);
+    const success = await register(form.name, form.email, form.password);
 
-      if (res.status === 201) {
-        setMessage("✅ Compte créé avec succès !");
-        setTimeout(() => navigate("/login"), 1500);
-      } else {
-        setMessage("❌ Une erreur est survenue.");
-      }
-    } catch (error) {
-      console.error("Erreur d'inscription :", error);
-      setMessage(
-        error.response?.data?.message || "Erreur lors de l'inscription."
-      );
-    } finally {
-      setLoading(false);
+    if (success) {
+      Swal.fire({
+        icon: "success",
+        title: "Compte créé 🎉",
+        text: "Votre compte a été créé avec succès. Vous pouvez maintenant vous connecter.",
+        confirmButtonColor: "#16a34a",
+        timer: 2500,
+      });
+      navigate("/login");
+    } else {
+      Swal.fire({
+        icon: "error",
+        title: "Erreur d'inscription",
+        text: error || "Impossible de créer le compte. Réessayez plus tard.",
+        confirmButtonColor: "#dc2626",
+      });
     }
   };
 
@@ -54,13 +51,13 @@ const RegisterPage = () => {
         transition={{ duration: 0.5 }}
         className="bg-card-light dark:bg-card-dark p-8 rounded-xl shadow-lg w-full max-w-md"
       >
-        {/* Titre */}
+        {/* 🔹 En-tête */}
         <div className="flex items-center justify-center gap-2 mb-6 text-primary">
           <UserPlus className="w-6 h-6" />
           <h2 className="text-2xl font-bold">Créer un compte</h2>
         </div>
 
-        {/* Formulaire */}
+        {/* 🔹 Formulaire */}
         <form onSubmit={handleSubmit} className="space-y-5">
           <div>
             <label className="text-sm font-medium">Nom complet</label>
@@ -70,21 +67,25 @@ const RegisterPage = () => {
               value={form.name}
               onChange={handleChange}
               required
-              className="w-full mt-1 p-3 rounded-lg border bg-subtle-light dark:bg-subtle-dark text-gray-800 dark:text-gray-100 focus:ring-2 focus:ring-primary outline-none"
               placeholder="Ex: Junior Akoudjé"
+              className="w-full mt-1 p-3 rounded-lg border border-gray-300 dark:border-gray-600 
+                         bg-subtle-light dark:bg-subtle-dark text-gray-800 dark:text-gray-100 
+                         focus:ring-2 focus:ring-primary outline-none"
             />
           </div>
 
           <div>
-            <label className="text-sm font-medium">Adresse email</label>
+            <label className="text-sm font-medium">Adresse e-mail</label>
             <input
               type="email"
               name="email"
               value={form.email}
               onChange={handleChange}
               required
-              className="w-full mt-1 p-3 rounded-lg border bg-subtle-light dark:bg-subtle-dark focus:ring-2 focus:ring-primary outline-none"
               placeholder="exemple@mail.com"
+              className="w-full mt-1 p-3 rounded-lg border border-gray-300 dark:border-gray-600 
+                         bg-subtle-light dark:bg-subtle-dark text-gray-800 dark:text-gray-100 
+                         focus:ring-2 focus:ring-primary outline-none"
             />
           </div>
 
@@ -97,17 +98,26 @@ const RegisterPage = () => {
               onChange={handleChange}
               required
               minLength={6}
-              className="w-full mt-1 p-3 rounded-lg border bg-subtle-light dark:bg-subtle-dark focus:ring-2 focus:ring-primary outline-none"
               placeholder="••••••••"
+              className="w-full mt-1 p-3 rounded-lg border border-gray-300 dark:border-gray-600 
+                         bg-subtle-light dark:bg-subtle-dark text-gray-800 dark:text-gray-100 
+                         focus:ring-2 focus:ring-primary outline-none"
             />
           </div>
 
-          {/* Bouton d’envoi */}
+          {/* Message d’erreur éventuel du contexte */}
+          {error && (
+            <p className="text-center text-sm mt-3 text-red-500 bg-red-100 dark:bg-red-900/20 p-2 rounded-lg">
+              {error}
+            </p>
+          )}
+
+          {/* 🔘 Bouton de création */}
           <button
             type="submit"
             disabled={loading}
-            className={`w-full flex justify-center items-center gap-2 py-3 rounded-lg font-semibold text-white transition 
-              ${loading ? "bg-gray-400" : "bg-primary hover:bg-primary/90"}`}
+            className="w-full flex justify-center items-center gap-2 py-3 rounded-lg font-semibold 
+                       text-white bg-primary hover:bg-primary/90 transition"
           >
             {loading ? (
               <>
@@ -117,22 +127,9 @@ const RegisterPage = () => {
               "Créer mon compte"
             )}
           </button>
-
-          {/* Message de feedback */}
-          {message && (
-            <p
-              className={`text-center text-sm mt-3 ${
-                message.startsWith("✅")
-                  ? "text-green-600 dark:text-green-400"
-                  : "text-red-500"
-              }`}
-            >
-              {message}
-            </p>
-          )}
         </form>
 
-        {/* Lien vers login */}
+        {/* 🔗 Lien vers connexion */}
         <p className="text-center text-sm text-gray-500 mt-6">
           Déjà inscrit ?{" "}
           <span
@@ -142,11 +139,14 @@ const RegisterPage = () => {
             Se connecter
           </span>
         </p>
+
+        {/* 🔸 Footer */}
+        <p className="text-center text-xs text-gray-400 dark:text-gray-500 mt-6">
+          © {new Date().getFullYear()} Kocrou Transport. Tous droits réservés.
+        </p>
       </motion.div>
     </section>
   );
 };
 
 export default RegisterPage;
-
-
