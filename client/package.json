@@ -29,11 +29,12 @@
     "@tailwindcss/typography": "^0.5.19",
     "autoprefixer": "^10.4.21",
     "postcss": "^8.5.6",
+    "shx": "^0.4.0",
     "tailwindcss": "^3.4.3"
   },
   "scripts": {
     "start": "react-scripts start",
-   "build": "react-scripts build && npx shx cp public/_redirects build/_redirects",
+    "build": "react-scripts build && npx shx cp public/_redirects build/_redirects",
     "test": "react-scripts test",
     "eject": "react-scripts eject",
     "lint": "eslint ./src --ext .js,.jsx"

@@ -45,6 +45,11 @@ const Header = () => {
             )}
             <a href="#destinations" className="text-sm font-medium hover:text-primary transition">Destinations</a>
             <a href="#contact" className="text-sm font-medium hover:text-primary transition">Contact</a>
+            {user && (
+              <Link to="/admin" className="text-sm font-medium hover:text-primary transition">
+                Dashboard
+              </Link>
+            )}
           </nav>
 
           {/* Actions */}
