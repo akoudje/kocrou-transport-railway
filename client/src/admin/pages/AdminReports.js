@@ -52,9 +52,9 @@ const AdminReports = () => {
     fetchReport();
   }, [monthFilter]); */
 
-   useEffect(() => {
-    fetchReport();
-  }, [fecthReport]);
+useEffect(() => {
+  fetchReport();
+}, [monthFilter]);
 
   // 📊 Génération Excel
   const exportToExcel = () => {
