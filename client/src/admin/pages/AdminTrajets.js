@@ -43,8 +43,8 @@ const AdminTrajets = () => {
   };
 
   useEffect(() => {
-    fetchTrajets();
-  }, []);
+  fetchTrajets();
+}, [fetchTrajets]);
 
   // ✅ Gérer les changements de champs
   const handleChange = (e) => {
