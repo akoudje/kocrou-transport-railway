@@ -1,7 +1,7 @@
 
 import React from "react";
-import { motion } from "framer-motion";
-import { MapPin } from "lucide-react";
+//import { motion } from "framer-motion";
+//import { MapPin } from "lucide-react";
 import YamoussoukroImg from "../assets/images/Yamoussoukro.jpg";
 import BouakeImgImg from "../assets/images/Bouake.jpg";
 import KorhogoImg from "../assets/images/Korhogo.jpg";
