@@ -7,6 +7,7 @@
     "dev": "concurrently \"npm start --prefix client\" \"npm start --prefix server\""
   },
   "devDependencies": {
-    "concurrently": "^9.1.2"
+    "concurrently": "^9.1.2",
+    "shx": "^0.4.0"
   }
 }
