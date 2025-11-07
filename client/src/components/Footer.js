@@ -9,26 +9,26 @@ const Footer = () => {
           <div>
             <h4 className="font-bold mb-4">Kocrou Transport</h4>
             <ul className="space-y-2">
-              <li><a href="#" className="text-sm hover:text-primary">À propos</a></li>
-              <li><a href="#" className="text-sm hover:text-primary">Contact</a></li>
-              <li><a href="#" className="text-sm hover:text-primary">Presse</a></li>
+             <li><button onClick={() => alert("À venir")}>À propos</button></li>
+              <li><button onClick={() => alert("À venir")}>Contact</button></li>
+              <li><button onClick={() => alert("À venir")}>Presse</button></li>
             </ul>
           </div>
 
           <div>
             <h4 className="font-bold mb-4">Support</h4>
             <ul className="space-y-2">
-              <li><a href="#" className="text-sm hover:text-primary">FAQ</a></li>
-              <li><a href="#" className="text-sm hover:text-primary">Centre d'aide</a></li>
-              <li><a href="#" className="text-sm hover:text-primary">Conditions Générales</a></li>
+               <li><button onClick={() => alert("À venir")}>FAQ</button></li>
+              <li><button onClick={() => alert("À venir")}>Centre d'aide</button></li>
+              <li><button onClick={() => alert("À venir")}>Conditions Générales</button></li>
             </ul>
           </div>
 
           <div>
             <h4 className="font-bold mb-4">Légal</h4>
             <ul className="space-y-2">
-              <li><a href="#" className="text-sm hover:text-primary">Confidentialité</a></li>
-              <li><a href="#" className="text-sm hover:text-primary">Mentions légales</a></li>
+              <li><button onClick={() => alert("À venir")}>Confidentialité</button></li>
+              <li><button onClick={() => alert("À venir")}>Mentions légales</button></li>
             </ul>
           </div>
 
