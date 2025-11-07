@@ -7,8 +7,6 @@ import {
   Edit,
   RefreshCw,
   Bus,
-  MapPin,
-  DollarSign,
   Loader2,
   Save,
 } from "lucide-react";
