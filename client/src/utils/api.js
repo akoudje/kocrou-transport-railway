@@ -3,11 +3,7 @@ import axios from "axios";
 import Swal from "sweetalert2";
 
 // 🌍 Base API URL : dynamique selon l'environnement
-const API_BASE =
-  process.env.REACT_APP_API_URL ||
-  (process.env.NODE_ENV === "production"
-    ? "https://booking-app-kocrou-transport-server.onrender.com"
-    : "http://localhost:5000");
+const API_BASE = process.env.REACT_APP_API_URL || "http://localhost:5000";
 
 // 🧩 Configuration Axios par défaut
 const api = axios.create({
