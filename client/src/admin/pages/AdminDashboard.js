@@ -1,5 +1,4 @@
-// src/client/admin/pages/AdminDashboard.js
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useCallback } from "react";
 import {
   LineChart,
   Line,
@@ -14,7 +13,7 @@ import {
   ResponsiveContainer,
 } from "recharts";
 import { Users, Bus, DollarSign, Calendar } from "lucide-react";
-import api from "../../utils/api"; // ✅ centralisé
+import api from "../../utils/api";
 
 const AdminDashboard = () => {
   const [stats, setStats] = useState({
@@ -29,8 +28,8 @@ const AdminDashboard = () => {
 
   const token = localStorage.getItem("token");
 
-  // ✅ Chargement des données globales
-  const fetchDashboardData = async () => {
+  // ✅ Chargement des données globales (stabilisée avec useCallback)
+  const fetchDashboardData = useCallback(async () => {
     try {
       setLoading(true);
 
@@ -49,7 +48,6 @@ const AdminDashboard = () => {
         0
       );
 
-      // ✅ Réservations par mois
       const monthly = {};
       reservationsRes.data.forEach((r) => {
         const month = new Date(r.dateReservation).toLocaleString("fr-FR", {
@@ -58,7 +56,6 @@ const AdminDashboard = () => {
         monthly[month] = (monthly[month] || 0) + 1;
       });
 
-      // ✅ Top destinations
       const destinations = {};
       reservationsRes.data.forEach((r) => {
         const dest = r.trajet?.villeArrivee || r.segment?.arrivee || "Inconnue";
@@ -80,11 +77,11 @@ const AdminDashboard = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [token]);
 
   useEffect(() => {
-  fetchDashboardData();
-}, [fetchDashboardData]);
+    fetchDashboardData();
+  }, [fetchDashboardData]);
 
   const COLORS = ["#2563eb", "#10b981", "#f59e0b", "#ef4444", "#8b5cf6"];
 
@@ -102,45 +99,10 @@ const AdminDashboard = () => {
         <main className="p-6 space-y-10">
           {/* 🔹 Cartes de statistiques */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-            <div className="p-5 bg-white dark:bg-card-dark rounded-xl shadow flex items-center justify-between">
-              <div>
-                <p className="text-gray-500 text-sm">Utilisateurs</p>
-                <h2 className="text-2xl font-bold text-text-light dark:text-text-dark">
-                  {stats.users}
-                </h2>
-              </div>
-              <Users className="text-primary w-8 h-8" />
-            </div>
-
-            <div className="p-5 bg-white dark:bg-card-dark rounded-xl shadow flex items-center justify-between">
-              <div>
-                <p className="text-gray-500 text-sm">Trajets</p>
-                <h2 className="text-2xl font-bold text-text-light dark:text-text-dark">
-                  {stats.trajets}
-                </h2>
-              </div>
-              <Bus className="text-green-500 w-8 h-8" />
-            </div>
-
-            <div className="p-5 bg-white dark:bg-card-dark rounded-xl shadow flex items-center justify-between">
-              <div>
-                <p className="text-gray-500 text-sm">Réservations</p>
-                <h2 className="text-2xl font-bold text-text-light dark:text-text-dark">
-                  {stats.reservations}
-                </h2>
-              </div>
-              <Calendar className="text-yellow-500 w-8 h-8" />
-            </div>
-
-            <div className="p-5 bg-white dark:bg-card-dark rounded-xl shadow flex items-center justify-between">
-              <div>
-                <p className="text-gray-500 text-sm">Revenus</p>
-                <h2 className="text-2xl font-bold text-text-light dark:text-text-dark">
-                  {stats.revenue.toLocaleString()} FCFA
-                </h2>
-              </div>
-              <DollarSign className="text-emerald-600 w-8 h-8" />
-            </div>
+            <StatCard title="Utilisateurs" value={stats.users} icon={<Users className="text-primary w-8 h-8" />} />
+            <StatCard title="Trajets" value={stats.trajets} icon={<Bus className="text-green-500 w-8 h-8" />} />
+            <StatCard title="Réservations" value={stats.reservations} icon={<Calendar className="text-yellow-500 w-8 h-8" />} />
+            <StatCard title="Revenus" value={`${stats.revenue.toLocaleString()} FCFA`} icon={<DollarSign className="text-emerald-600 w-8 h-8" />} />
           </div>
 
           {/* 📈 Graphique : Réservations par mois */}
@@ -189,5 +151,16 @@ const AdminDashboard = () => {
     </div>
   );
 };
+
+// 🧩 Composant réutilisable pour les cartes
+const StatCard = ({ title, value, icon }) => (
+  <div className="p-5 bg-white dark:bg-card-dark rounded-xl shadow flex items-center justify-between">
+    <div>
+      <p className="text-gray-500 text-sm">{title}</p>
+      <h2 className="text-2xl font-bold text-text-light dark:text-text-dark">{value}</h2>
+    </div>
+    {icon}
+  </div>
+);
 
 export default AdminDashboard;

@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useCallback } from "react";
 import { motion } from "framer-motion";
 import {
   FileText,
@@ -32,8 +32,7 @@ const AdminReports = () => {
   const [monthFilter, setMonthFilter] = useState("");
   const token = localStorage.getItem("token");
 
-  // 🎯 Charger les données du backend
-  const fetchReport = async () => {
+  const fetchReport = useCallback(async () => {
     try {
       setLoading(true);
       const { data } = await api.get(`/reports?month=${monthFilter}`, {
@@ -46,17 +45,12 @@ const AdminReports = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [monthFilter, token]);
 
-/*   useEffect(() => {
+  useEffect(() => {
     fetchReport();
-  }, [monthFilter]); */
+  }, [fetchReport]);
 
-useEffect(() => {
-  fetchReport();
-}, [monthFilter]);
-
-  // 📊 Génération Excel
   const exportToExcel = () => {
     if (!reportData) return;
     const wb = XLSX.utils.book_new();
@@ -77,16 +71,13 @@ useEffect(() => {
     XLSX.writeFile(wb, "rapport_kocrou_transport.xlsx");
   };
 
-  // 📄 Génération PDF
   const exportToPDF = () => {
     if (!reportData) return;
     const doc = new jsPDF();
     doc.setFontSize(14);
     doc.text("Rapport Kocrou Transport", 14, 20);
     doc.text(
-      `Période : ${monthFilter || "Tous les mois"} - Généré le ${new Date().toLocaleDateString(
-        "fr-FR"
-      )}`,
+      `Période : ${monthFilter || "Tous les mois"} - Généré le ${new Date().toLocaleDateString("fr-FR")}`,
       14,
       28
     );
@@ -169,26 +160,10 @@ useEffect(() => {
           <>
             {/* 🔸 Statistiques globales */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-10">
-              <StatCard
-                title="Total Réservations"
-                value={reportData.totalReservations}
-                color="text-blue-500"
-              />
-              <StatCard
-                title="Revenus Totaux"
-                value={`${reportData.totalRevenue.toLocaleString()} FCFA`}
-                color="text-green-500"
-              />
-              <StatCard
-                title="Validées"
-                value={reportData.validatedCount}
-                color="text-emerald-500"
-              />
-              <StatCard
-                title="Annulées"
-                value={reportData.cancelledCount}
-                color="text-red-500"
-              />
+              <StatCard title="Total Réservations" value={reportData.totalReservations} color="text-blue-500" />
+              <StatCard title="Revenus Totaux" value={`${reportData.totalRevenue.toLocaleString()} FCFA`} color="text-green-500" />
+              <StatCard title="Validées" value={reportData.validatedCount} color="text-emerald-500" />
+              <StatCard title="Annulées" value={reportData.cancelledCount} color="text-red-500" />
             </div>
 
             {/* 📊 Graphiques */}

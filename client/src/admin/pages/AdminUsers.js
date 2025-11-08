@@ -1,5 +1,5 @@
 // src/client/admin/pages/AdminUsers.js
-import React, { useEffect, useState, useContext } from "react";
+import React, { useEffect, useState, useContext,useCallback } from "react";
 import { motion } from "framer-motion";
 import {
   User,
@@ -28,23 +28,24 @@ const AdminUsers = () => {
   const token = localStorage.getItem("token");
 
   // ✅ Charger tous les utilisateurs
-  const fetchUsers = async () => {
-    try {
-      setLoading(true);
-      const { data } = await api.get("/users", {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      setUsers(data);
-      setFilteredUsers(data);
-    } catch (err) {
-      console.error("Erreur chargement utilisateurs :", err);
-      setError("Impossible de charger les utilisateurs.");
-    } finally {
-      setLoading(false);
-    }
-  };
 
-  useEffect(() => {
+const fetchUsers = useCallback(async () => {
+  try {
+    setLoading(true);
+    const { data } = await api.get("/users", {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    setUsers(data);
+    setFilteredUsers(data);
+  } catch (err) {
+    console.error("Erreur chargement utilisateurs :", err);
+    setError("Impossible de charger les utilisateurs.");
+  } finally {
+    setLoading(false);
+  }
+}, [token]); // ✅ dépendance nécessaire
+
+useEffect(() => {
   fetchUsers();
 }, [fetchUsers]);
 

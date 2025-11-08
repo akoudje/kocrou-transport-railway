@@ -1,5 +1,5 @@
 // src/client/admin/pages/AdminTrajets.js
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useCallback } from "react";
 import { motion } from "framer-motion";
 import {
   Plus,
@@ -28,21 +28,22 @@ const AdminTrajets = () => {
   const token = localStorage.getItem("token");
 
   // ✅ Charger les trajets
-  const fetchTrajets = async () => {
-    try {
-      setLoading(true);
-      const { data } = await api.get("/trajets", {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      setTrajets(data);
-    } catch (err) {
-      console.error("Erreur chargement trajets :", err);
-    } finally {
-      setLoading(false);
-    }
-  };
 
-  useEffect(() => {
+const fetchTrajets = useCallback(async () => {
+  try {
+    setLoading(true);
+    const { data } = await api.get("/trajets", {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    setTrajets(data);
+  } catch (err) {
+    console.error("Erreur chargement trajets :", err);
+  } finally {
+    setLoading(false);
+  }
+}, [token]); // ✅ dépendance nécessaire
+
+useEffect(() => {
   fetchTrajets();
 }, [fetchTrajets]);
 

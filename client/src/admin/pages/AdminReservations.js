@@ -1,5 +1,5 @@
 // src/client/admin/pages/AdminReservations.js
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useCallback } from "react";
 import { motion } from "framer-motion";
 import {
   Loader2,
@@ -26,25 +26,26 @@ const AdminReservations = () => {
   const token = localStorage.getItem("token");
 
   // ✅ Charger toutes les réservations
-  const fetchReservations = async () => {
-    try {
-      setLoading(true);
-      const { data } = await api.get("/reservations/all", {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      setReservations(data);
-      setFiltered(data);
-    } catch (err) {
-      console.error("Erreur chargement réservations :", err);
-      Swal.fire("Erreur", "Impossible de charger les réservations.", "error");
-    } finally {
-      setLoading(false);
-    }
-  };
+  const fetchReservations = useCallback(async () => {
+  try {
+    setLoading(true);
+    const { data } = await api.get("/reservations/all", {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    setReservations(data);
+    setFiltered(data);
+  } catch (err) {
+    console.error("Erreur chargement réservations :", err);
+    Swal.fire("Erreur", "Impossible de charger les réservations.", "error");
+  } finally {
+    setLoading(false);
+  }
+}, [token]); // ✅ ajout de la dépendance nécessaire
 
-  useEffect(() => {
+useEffect(() => {
   fetchReservations();
 }, [fetchReservations]);
+
 
   // ✅ Filtrage dynamique
   useEffect(() => {
